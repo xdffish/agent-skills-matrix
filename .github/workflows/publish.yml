@@ -17,6 +17,8 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +50,24 @@ jobs:
       - name: Check types
         if: steps.version.outputs.publish == 'true'
         run: npm run type-check
-      - name: Publish to Visual Studio Marketplace
+      - name: Check VS Code Marketplace publisher
+        id: publisher
         if: steps.version.outputs.publish == 'true'
+        run: |
+          publisher=$(node -p "require('./package.json').publisher")
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://marketplace.visualstudio.com/publishers/$publisher")
+          if [ "$status" = "200" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Publisher '$publisher' is not available on the VS Code Marketplace; skipping that publish step."
+          fi
+      - name: Publish to Visual Studio Marketplace
+        if: steps.version.outputs.publish == 'true' && steps.publisher.outputs.ready == 'true'
         run: npx --yes @vscode/vsce@4.1.0 publish --oidc --no-dependencies
+      - name: Package for Open VSX
+        if: steps.version.outputs.publish == 'true' && env.OVSX_PAT != ''
+        run: npx --yes @vscode/vsce@4.1.0 package --no-dependencies -o agent-skills-matrix.vsix
+      - name: Publish to Open VSX
+        if: steps.version.outputs.publish == 'true' && env.OVSX_PAT != ''
+        run: npx --yes ovsx@latest publish agent-skills-matrix.vsix -p "$OVSX_PAT"

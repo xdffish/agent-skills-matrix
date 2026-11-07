@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-[![Version](https://img.shields.io/badge/version-0.5.10-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.11-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![Agent Skills Matrix dashboard](docs/screenshots/dashboard.png)
@@ -40,14 +40,22 @@ Discovery is limited to implemented paths and cache layouts; custom locations ar
 
 ## Installation
 
-Install a packaged `agent-skills-matrix-0.5.10.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
+The extension ID is `xdffish.agent-skills-matrix`, published on [Open VSX](https://open-vsx.org/extension/xdffish/agent-skills-matrix). Editors that use that marketplace, such as Antigravity, Cursor, and VSCodium, can install it by searching for **Agent Skills Matrix** in the Extensions view, or from the command line:
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.10.vsix
-cursor --install-extension agent-skills-matrix-0.5.10.vsix
+code --install-extension xdffish.agent-skills-matrix
+cursor --install-extension xdffish.agent-skills-matrix
+antigravity --install-extension xdffish.agent-skills-matrix
 ```
 
-The package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
+Alternatively, download `agent-skills-matrix-0.5.11.vsix` and use **Extensions: Install from VSIX...** in the Command Palette:
+
+```bash
+code --install-extension agent-skills-matrix-0.5.11.vsix
+cursor --install-extension agent-skills-matrix-0.5.11.vsix
+```
+
+The earlier 0.5.10 release that was uploaded to the VS Code Marketplace under the `denny` publisher is no longer updated; use the extension ID above. The VSIX package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
 
 ## Usage
 
@@ -69,7 +77,7 @@ npm run vsce:package
 
 `npm run watch` rebuilds on changes. `npm run test:cli` runs the CLI runner against the local environment.
 
-When a push to `main` changes the version in `package.json`, GitHub Actions publishes the extension to the VS Code Marketplace using trusted publishing. The workflow can also be run manually from the Actions page.
+When a push to `main` changes the version in `package.json`, GitHub Actions packages the extension and publishes it: to Open VSX when the `OVSX_PAT` secret is configured, and to the VS Code Marketplace once the `xdffish` publisher exists there (that step is skipped otherwise). The workflow can also be run manually from the Actions page.
 
 ## License
 

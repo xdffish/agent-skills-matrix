@@ -148,6 +148,11 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 
 ## 📜 7. 变更日志 (Changelog)
 
+### v0.5.11 (2026-11-07)
+- **Release**: 发布者统一为 `xdffish`，扩展以 `xdffish.agent-skills-matrix` 发布；VS Code Marketplace 上早期的 `denny.agent-skills-matrix` 不再更新。
+- **CI**: 发布工作流新增 Open VSX 发布步骤（需要仓库 secret `OVSX_PAT`），并在 Marketplace 发布者不存在时自动跳过该步骤，避免版本号变动时构建失败。
+- **Docs**: 中英文 README 更新安装方式（Open VSX / VSIX）与自动发布说明。
+
 ### v0.5.10 (2026-11-07)
 - **Fix**: 自动发布使用 npm 实际提供的 `vsce` 4.1.0。
 
