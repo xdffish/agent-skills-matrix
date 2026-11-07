@@ -1,7 +1,30 @@
 # Agent Skills Matrix
 
-[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.4-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## 中文介绍
+
+**Agent Skills Matrix** 是一个用于查看和管理 AI Agent 技能的 VS Code 兼容扩展。它通过读取本机文件系统，集中展示公共技能、各 Agent 的技能以及当前项目中的技能。
+
+主要功能：
+
+- **公共技能矩阵**：查看公共技能池，并为已发现的 Agent 挂载或解除软链接。
+- **Agent 专属视图**：查看私有技能、公共池挂载状态，以及扫描到的系统和插件技能。
+- **当前项目**：只读浏览工作区 `.github/skills`、`.agents/skills` 和 `.claude/skills` 中的技能。
+- **技能集市**：通过 `npx skills` 安装精选技能包，并选择目标 Agent。
+- **双视图**：侧边栏提供紧凑视图，编辑器主区域提供更宽的管理面板。
+- **搜索与中文说明**：按名称或描述搜索，鼠标悬停可查看完整说明。
+
+扩展目前支持扫描 Antigravity、Cursor、Codex、Claude Code、WorkBuddy、Trae、Warp、Hermes Agent 和 GitHub Copilot 的预设目录。扫描到文件表示它存在于磁盘上，并不保证对应 Agent 或当前会话已经加载该技能；插件缓存中也可能包含未启用的版本。
+
+### 安装
+
+在 VS Code 或兼容编辑器中打开命令面板，选择 **Extensions: Install from VSIX...**，然后选择项目打包生成的 `agent-skills-matrix-0.5.4.vsix`。安装后可从左侧活动栏打开；点击侧栏标题栏按钮或状态栏的 **Skills Matrix**，可打开编辑器区域中的大面板。
+
+项目技能视图目前仅支持本地工作区，Windows 特定路径和目录链接行为尚未在 Windows 实机验证。
+
+---
 
 Agent Skills Matrix is a VS Code-compatible extension for inspecting and managing skill directories across multiple AI agents. It reads filesystem state directly and uses `npx skills` for package installation.
 
@@ -36,11 +59,11 @@ Discovery is limited to implemented paths and cache layouts; custom locations ar
 
 ## Installation
 
-Install a packaged `agent-skills-matrix-0.5.3.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
+Install a packaged `agent-skills-matrix-0.5.4.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.3.vsix
-cursor --install-extension agent-skills-matrix-0.5.3.vsix
+code --install-extension agent-skills-matrix-0.5.4.vsix
+cursor --install-extension agent-skills-matrix-0.5.4.vsix
 ```
 
 The package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
