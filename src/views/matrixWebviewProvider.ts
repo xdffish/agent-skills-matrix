@@ -159,6 +159,13 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
             await this.refresh();
             break;
           }
+
+          case 'openExternalUrl': {
+            if (data.payload.url) {
+              vscode.env.openExternal(vscode.Uri.parse(data.payload.url));
+            }
+            break;
+          }
         }
       } catch (err: any) {
         this.sendMessage({
@@ -232,6 +239,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
         <span id="header-status-badge" class="count-chip">Loading...</span>
       </div>
       <div class="action-buttons">
+        <button id="skills-sh-btn" class="btn btn-secondary btn-sm" title="浏览 skills.sh 官网技能市场">🌐 skills.sh ↗</button>
         <button id="add-skill-btn" class="btn btn-sm" title="Install New Skill">+ Install</button>
         <button id="refresh-btn" class="btn btn-secondary btn-sm" title="Refresh">⟳</button>
       </div>

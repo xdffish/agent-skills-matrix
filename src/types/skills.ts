@@ -164,6 +164,12 @@ export type WebviewToExtensionMsg =
         skillPath: string;
         skillName: string;
       };
+    }
+  | {
+      type: 'openExternalUrl';
+      payload: {
+        url: string;
+      };
     };
 
 export type ExtensionToWebviewMsg =

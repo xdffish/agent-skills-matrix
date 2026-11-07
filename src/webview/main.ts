@@ -5,6 +5,7 @@ import {
   PublicSkillItem,
   WebviewToExtensionMsg
 } from '../types/skills';
+import { MARKETPLACE_CATALOG, MarketplaceSkill } from '../types/marketplace';
 
 declare function acquireVsCodeApi(): {
   postMessage(msg: WebviewToExtensionMsg): void;
@@ -15,9 +16,10 @@ declare function acquireVsCodeApi(): {
 const vscode = acquireVsCodeApi();
 
 interface WebviewState {
-  currentPerspective: string; // 'public' or agent.id
+  currentPerspective: string; // 'public', 'marketplace', or agent.id
   searchQuery: string;
   partition2Filter: 'all' | 'enabled' | 'disabled';
+  marketCategory: string;
   matrixData: MatrixData | null;
 }
 
@@ -25,6 +27,7 @@ let state: WebviewState = {
   currentPerspective: 'public',
   searchQuery: '',
   partition2Filter: 'all',
+  marketCategory: 'all',
   matrixData: null
 };
 
@@ -32,6 +35,7 @@ let state: WebviewState = {
 const headerBadge = document.getElementById('header-status-badge') as HTMLElement;
 const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement;
 const addSkillBtn = document.getElementById('add-skill-btn') as HTMLButtonElement;
+const skillsShBtn = document.getElementById('skills-sh-btn') as HTMLButtonElement;
 const searchInput = document.getElementById('search-input') as HTMLInputElement;
 const clearSearchBtn = document.getElementById('clear-search-btn') as HTMLButtonElement;
 const viewTabsBar = document.getElementById('view-tabs') as HTMLElement;
@@ -49,6 +53,9 @@ const agentCheckboxes = document.getElementById('agent-checkboxes') as HTMLEleme
 
 function init() {
   refreshBtn?.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
+  skillsShBtn?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openExternalUrl', payload: { url: 'https://skills.sh' } });
+  });
 
   searchInput?.addEventListener('input', e => {
     state.searchQuery = (e.target as HTMLInputElement).value.trim().toLowerCase();
@@ -63,7 +70,7 @@ function init() {
     render();
   });
 
-  addSkillBtn?.addEventListener('click', openAddModal);
+  addSkillBtn?.addEventListener('click', () => openAddModal());
   modalCloseBtn?.addEventListener('click', closeAddModal);
   modalCancelBtn?.addEventListener('click', closeAddModal);
   addModal?.addEventListener('click', e => { if (e.target === addModal) closeAddModal(); });
@@ -80,7 +87,7 @@ function init() {
   });
 }
 
-function openAddModal() {
+function openAddModal(prefillPkg?: string) {
   if (!state.matrixData) return;
   agentCheckboxes.innerHTML = '';
   state.matrixData.agents.filter(a => a.isDetected).forEach(agent => {
@@ -93,6 +100,9 @@ function openAddModal() {
     `;
     agentCheckboxes.appendChild(label);
   });
+  if (prefillPkg) {
+    pkgInput.value = prefillPkg;
+  }
   addModal.classList.add('open');
   pkgInput.focus();
 }
@@ -129,7 +139,21 @@ function renderTabs() {
   });
   viewTabsBar.appendChild(pubTab);
 
-  // 2. Individual Agent Tabs
+  // 2. Marketplace Tab
+  const marketTab = document.createElement('div');
+  marketTab.className = `tab-btn ${state.currentPerspective === 'marketplace' ? 'active' : ''}`;
+  marketTab.innerHTML = `
+    <span>🛒 技能集市</span>
+    <span class="tab-badge">${MARKETPLACE_CATALOG.length}</span>
+  `;
+  marketTab.addEventListener('click', () => {
+    state.currentPerspective = 'marketplace';
+    renderTabs();
+    render();
+  });
+  viewTabsBar.appendChild(marketTab);
+
+  // 3. Individual Agent Tabs
   agents.filter(a => a.isDetected).forEach(agent => {
     const detail = agentDetails[agent.id];
     const totalActive = detail ? detail.totalActiveCount : 0;
@@ -153,6 +177,8 @@ function render() {
   if (!state.matrixData) return;
   if (state.currentPerspective === 'public') {
     renderPublicView();
+  } else if (state.currentPerspective === 'marketplace') {
+    renderMarketplaceView();
   } else {
     renderDedicatedAgentView(state.currentPerspective);
   }
@@ -280,6 +306,160 @@ function bindPublicEvents() {
     el.addEventListener('click', () => {
       const skillName = el.getAttribute('data-skill')!;
       vscode.postMessage({ type: 'removePublicSkill', payload: { skillName } });
+    });
+  });
+}
+
+// -------------------------------------------------------------
+// Perspective: Marketplace Gallery View
+// -------------------------------------------------------------
+function renderMarketplaceView() {
+  const publicSkills = state.matrixData?.publicSkills || [];
+  const categories = [
+    { id: 'all', label: '全部' },
+    { id: 'popular', label: '🔥 热门精选' },
+    { id: 'dev', label: '🛠 编程开发' },
+    { id: 'design', label: '🎨 视觉与设计' },
+    { id: 'productivity', label: '⚡ 效率办公' },
+    { id: 'cloud', label: '☁️ 云原生与运维' },
+    { id: 'agent', label: '🤖 AI 与智能体' }
+  ];
+
+  const filtered = MARKETPLACE_CATALOG.filter(item => {
+    if (state.marketCategory !== 'all' && item.category !== state.marketCategory) {
+      return false;
+    }
+    if (!state.searchQuery) return true;
+    const q = state.searchQuery;
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.titleZh.toLowerCase().includes(q) ||
+      item.descriptionZh.toLowerCase().includes(q) ||
+      item.author.toLowerCase().includes(q) ||
+      item.packageRef.toLowerCase().includes(q)
+    );
+  });
+
+  headerBadge.textContent = `${filtered.length} / ${MARKETPLACE_CATALOG.length} 精选技能`;
+
+  let html = `
+    <div class="market-container">
+      <div class="market-hero">
+        <div>
+          <div class="market-hero-title">
+            <span>🛒 Agent Skills 开源精选集市</span>
+            <span class="badge-tag badge-info">官方 & 社区聚合</span>
+          </div>
+          <div class="market-hero-desc">浏览与安装全网优质开源技能包，一键收录至公共库 (~/.agents/skills) 并挂载至各 Agent</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn btn-secondary btn-sm" data-action="open-url" data-url="https://skills.sh" title="打开 skills.sh 官网全网技能库">
+            🌐 浏览 skills.sh 官网 ↗
+          </button>
+        </div>
+      </div>
+
+      <div class="market-category-bar">
+  `;
+
+  categories.forEach(cat => {
+    const isActive = state.marketCategory === cat.id;
+    html += `
+      <button class="filter-pill-btn ${isActive ? 'active' : ''}" data-cat="${cat.id}">
+        ${cat.label}
+      </button>
+    `;
+  });
+
+  html += `</div>`;
+
+  if (filtered.length === 0) {
+    html += `<div class="empty-state">没有找到匹配的精选技能。您可以点击右上角【+ Install】直接输入任意 npm / GitHub 仓库地址进行安装。</div></div>`;
+    mainContent.innerHTML = html;
+    bindMarketEvents();
+    return;
+  }
+
+  html += `<div class="market-grid">`;
+
+  filtered.forEach(item => {
+    const isInstalled = publicSkills.some(
+      p => p.name.toLowerCase() === item.name.toLowerCase() ||
+           p.name.toLowerCase() === item.id.toLowerCase() ||
+           item.packageRef.toLowerCase().endsWith('/' + p.name.toLowerCase())
+    );
+
+    html += `
+      <div class="market-card">
+        <div>
+          <div class="market-card-top">
+            <div class="market-card-icon">${item.icon}</div>
+            <div class="market-card-info">
+              <div class="market-card-title">${item.titleZh}</div>
+              <div class="market-card-author">
+                <span>by ${item.author}</span>
+                <span class="badge-tag" style="padding:1px 5px; font-size:9px;">${item.categoryLabel}</span>
+              </div>
+            </div>
+          </div>
+          <div class="market-card-desc" style="margin-top:8px;" title="${item.descriptionZh}">
+            ${item.descriptionZh}
+          </div>
+        </div>
+
+        <div class="market-card-footer">
+          <div class="market-card-meta">
+            ${item.stars ? `<span>⭐ ${item.stars}</span>` : ''}
+            <span style="font-family:monospace; opacity:0.75;" title="包名引用: ${item.packageRef}">${item.packageRef.length > 20 ? item.packageRef.substring(0, 18) + '…' : item.packageRef}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            ${item.githubUrl ? `
+              <button class="btn btn-secondary btn-sm" data-action="open-url" data-url="${item.githubUrl}" title="查看源码与仓库" style="padding:2px 7px;">
+                ↗
+              </button>
+            ` : ''}
+            ${isInstalled ? `
+              <button class="btn btn-secondary btn-sm" style="color:var(--success-color, #10B981); cursor:default;" title="该技能已存在于本机公共技能库中">
+                ✓ 已收录
+              </button>
+            ` : `
+              <button class="btn btn-primary btn-sm" data-action="install-market" data-pkg="${item.packageRef}" title="一键收录至公共库并选择挂载 Agent">
+                📥 一键安装
+              </button>
+            `}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div></div>`;
+  mainContent.innerHTML = html;
+  bindMarketEvents();
+}
+
+function bindMarketEvents() {
+  mainContent.querySelectorAll<HTMLElement>('.filter-pill-btn[data-cat]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.marketCategory = el.getAttribute('data-cat') || 'all';
+      render();
+    });
+  });
+
+  mainContent.querySelectorAll<HTMLElement>('[data-action="open-url"]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const url = el.getAttribute('data-url');
+      if (url) vscode.postMessage({ type: 'openExternalUrl', payload: { url } });
+    });
+  });
+
+  mainContent.querySelectorAll<HTMLElement>('[data-action="install-market"]').forEach(el => {
+    el.addEventListener('click', () => {
+      const pkg = el.getAttribute('data-pkg');
+      if (pkg) {
+        openAddModal(pkg);
+      }
     });
   });
 }
