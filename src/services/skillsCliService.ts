@@ -62,22 +62,6 @@ const KNOWN_AGENTS_CONFIG: Array<{
     accent: 'rgba(245, 158, 11, 0.15)'
   },
   {
-    id: 'github-copilot',
-    name: 'GitHub Copilot',
-    cliArg: 'github-copilot',
-    relDir: path.join('.github', 'skills'),
-    color: '#6366F1',
-    accent: 'rgba(99, 102, 241, 0.15)'
-  },
-  {
-    id: 'zed',
-    name: 'Zed',
-    cliArg: 'zed',
-    relDir: path.join('.zed', 'skills'),
-    color: '#EC4899',
-    accent: 'rgba(236, 72, 153, 0.15)'
-  },
-  {
     id: 'warp',
     name: 'Warp',
     cliArg: 'warp',
@@ -92,6 +76,22 @@ const KNOWN_AGENTS_CONFIG: Array<{
     relDir: path.join('.hermes', 'skills'),
     color: '#14B8A6',
     accent: 'rgba(20, 184, 166, 0.15)'
+  },
+  {
+    id: 'github-copilot',
+    name: 'GitHub Copilot',
+    cliArg: 'github-copilot',
+    relDir: path.join('.github', 'skills'),
+    color: '#6366F1',
+    accent: 'rgba(99, 102, 241, 0.15)'
+  },
+  {
+    id: 'zed',
+    name: 'Zed',
+    cliArg: 'zed',
+    relDir: path.join('.zed', 'skills'),
+    color: '#EC4899',
+    accent: 'rgba(236, 72, 153, 0.15)'
   }
 ];
 
@@ -108,7 +108,6 @@ export class SkillsCliService {
   public detectAgents(): AgentDefinition[] {
     return KNOWN_AGENTS_CONFIG.map(cfg => {
       const fullPath = path.join(this.homedir, cfg.relDir);
-      // Detected if the skills directory exists or parent config directory exists
       const parentDir = path.dirname(fullPath);
       const isDetected = fs.existsSync(fullPath) || fs.existsSync(parentDir);
 
@@ -130,11 +129,10 @@ export class SkillsCliService {
    */
   public async runCli(args: string[]): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      // Execute npx directly without shell: true to avoid DEP0190 and command injection risks
       const proc = childProcess.spawn('npx', ['skills', ...args], {
         env: {
           ...process.env,
-          FORCE_COLOR: '0', // disable ANSI styling in output
+          FORCE_COLOR: '0',
           NO_COLOR: '1'
         }
       });
@@ -150,7 +148,6 @@ export class SkillsCliService {
         stderr += data.toString();
       });
 
-      // 30 seconds execution timeout
       const timer = setTimeout(() => {
         proc.kill('SIGKILL');
         reject(new Error(`Command timed out after 30s: npx skills ${args.join(' ')}`));
@@ -158,12 +155,7 @@ export class SkillsCliService {
 
       proc.on('close', code => {
         clearTimeout(timer);
-        if (code === 0) {
-          resolve({ stdout, stderr });
-        } else {
-          // Even on non-zero exit codes, if valid JSON is in stdout, let caller examine
-          resolve({ stdout, stderr });
-        }
+        resolve({ stdout, stderr });
       });
 
       proc.on('error', err => {
@@ -174,8 +166,7 @@ export class SkillsCliService {
   }
 
   /**
-   * Extract JSON array or object cleanly from command output,
-   * bypassing warning logs like "⚠ Skipped /path/SKILL.md".
+   * Extract JSON array or object cleanly from command output.
    */
   public extractJson<T>(rawOutput: string): T {
     const firstBracket = rawOutput.indexOf('[');
@@ -201,7 +192,7 @@ export class SkillsCliService {
   }
 
   /**
-   * Parse description frontmatter from SKILL.md if present.
+   * Parse description cleanly from SKILL.md, handling YAML block scalar folding (> / >-).
    */
   private extractSkillDescription(skillPath: string | null): string {
     if (!skillPath) {
@@ -213,18 +204,56 @@ export class SkillsCliService {
         return '';
       }
       const content = fs.readFileSync(skillMdPath, 'utf-8');
-      // Match YAML frontmatter description:
-      const descMatch = content.match(/description:\s*(.+)/i);
-      if (descMatch && descMatch[1]) {
-        return descMatch[1].trim().replace(/^['"]|['"]$/g, '');
-      }
-      // Or first markdown paragraph
       const lines = content.split('\n');
-      for (const line of lines) {
+
+      let inYaml = false;
+      let captureMultilineDesc = false;
+      let multilineDesc = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('---')) {
-          return trimmed.slice(0, 140);
+
+        if (trimmed === '---') {
+          if (!inYaml) {
+            inYaml = true;
+            continue;
+          } else {
+            // End of YAML frontmatter
+            break;
+          }
         }
+
+        if (inYaml) {
+          if (captureMultilineDesc) {
+            // Indented line belongs to multiline description
+            if (line.startsWith('  ') || line.startsWith('\t')) {
+              multilineDesc += ' ' + trimmed;
+              continue;
+            } else {
+              captureMultilineDesc = false;
+            }
+          }
+
+          if (trimmed.startsWith('description:')) {
+            const descValue = trimmed.substring('description:'.length).trim();
+            if (descValue === '>' || descValue === '>-' || descValue === '|' || descValue === '|-') {
+              captureMultilineDesc = true;
+              continue;
+            } else if (descValue) {
+              return descValue.replace(/^['"]|['"]$/g, '');
+            }
+          }
+        } else {
+          // Outside YAML: look for first text paragraph
+          if (trimmed && !trimmed.startsWith('#')) {
+            return trimmed.slice(0, 160);
+          }
+        }
+      }
+
+      if (multilineDesc.trim()) {
+        return multilineDesc.trim().slice(0, 160);
       }
     } catch {
       // Ignore reading errors
@@ -233,7 +262,27 @@ export class SkillsCliService {
   }
 
   /**
-   * Retrieve all global skills with their agent mounting status.
+   * Check real physical filesystem to verify whether a skill is genuinely mounted to an agent.
+   */
+  private getRealMountedAgents(skillName: string, agents: AgentDefinition[]): string[] {
+    const mounted: string[] = [];
+    for (const agent of agents) {
+      if (!agent.isDetected) continue;
+      const agentSkillPath = path.join(agent.fullSkillsDir, skillName);
+      try {
+        // True if symlink or physical directory exists in the agent's skills dir
+        if (fs.existsSync(agentSkillPath) || fs.lstatSync(agentSkillPath).isSymbolicLink()) {
+          mounted.push(agent.name);
+        }
+      } catch {
+        // Not mounted
+      }
+    }
+    return mounted;
+  }
+
+  /**
+   * Retrieve all skills with their verified ground-truth mounting status.
    */
   public async getMatrixData(): Promise<MatrixData> {
     const agents = this.detectAgents();
@@ -244,14 +293,18 @@ export class SkillsCliService {
       rawSkills = this.extractJson<RawSkillRecord[]>(stdout);
     } catch (err) {
       console.error('Failed to parse npx skills list -g --json:', err);
-      // Fallback: scan ~/.agents/skills directory directly if CLI has issues
       rawSkills = this.scanLocalAgentsSkills();
     }
 
+    // Merge and cross-verify with REAL filesystem
     const skills: SkillItem[] = rawSkills.map(raw => {
       const description = this.extractSkillDescription(raw.path);
+      // Replace npx skills hallucinated agents with physical truth
+      const verifiedAgents = this.getRealMountedAgents(raw.name, agents);
+
       return {
         ...raw,
+        agents: verifiedAgents,
         description: description || undefined
       };
     });
@@ -301,7 +354,6 @@ export class SkillsCliService {
 
   /**
    * Toggle a skill for a specific agent.
-   * Uses standard npx skills CLI delegation with atomic filesystem validation.
    */
   public async toggleAgentSkill(
     skillName: string,
@@ -309,7 +361,6 @@ export class SkillsCliService {
     enable: boolean,
     isGlobal: boolean = true
   ): Promise<{ success: boolean; message: string }> {
-    // 1. Safety Guard check
     if (PROTECTED_SKILL_NAMES.has(skillName)) {
       throw new Error(`Security Exception: Cannot modify protected system component "${skillName}".`);
     }
@@ -320,7 +371,6 @@ export class SkillsCliService {
       throw new Error(`Unknown agent: "${agentId}"`);
     }
 
-    // Ensure agent skills directory exists
     if (!fs.existsSync(targetAgent.fullSkillsDir)) {
       fs.mkdirSync(targetAgent.fullSkillsDir, { recursive: true });
     }
@@ -329,13 +379,10 @@ export class SkillsCliService {
     const centralSkillPath = path.join(this.homedir, '.agents', 'skills', skillName);
 
     if (enable) {
-      // Connect / Symlink
       if (!fs.existsSync(agentSkillPath)) {
         if (fs.existsSync(centralSkillPath)) {
-          // Direct atomic symlink creation for instant feedback
           fs.symlinkSync(centralSkillPath, agentSkillPath);
         } else {
-          // Delegate to CLI install if not present in central pool
           const scopeFlag = isGlobal ? '-g' : '';
           await this.runCli(['add', skillName, '-a', targetAgent.cliArg, scopeFlag, '-y'].filter(Boolean));
         }
@@ -345,15 +392,17 @@ export class SkillsCliService {
         message: `Successfully enabled "${skillName}" for ${targetAgent.name}`
       };
     } else {
-      // Disconnect / Remove Symlink
       if (fs.existsSync(agentSkillPath) || fs.lstatSync(agentSkillPath).isSymbolicLink()) {
-        const stat = fs.lstatSync(agentSkillPath);
-        if (stat.isSymbolicLink()) {
-          fs.unlinkSync(agentSkillPath);
-        } else {
-          // If it's a physical directory in the agent folder, delegate to CLI
-          const scopeFlag = isGlobal ? '-g' : '';
-          await this.runCli(['remove', skillName, '-a', targetAgent.cliArg, scopeFlag, '-y'].filter(Boolean));
+        try {
+          const stat = fs.lstatSync(agentSkillPath);
+          if (stat.isSymbolicLink()) {
+            fs.unlinkSync(agentSkillPath);
+          } else {
+            const scopeFlag = isGlobal ? '-g' : '';
+            await this.runCli(['remove', skillName, '-a', targetAgent.cliArg, scopeFlag, '-y'].filter(Boolean));
+          }
+        } catch (e: any) {
+          throw new Error(`Failed to remove skill symlink: ${e.message}`);
         }
       }
       return {
@@ -385,7 +434,7 @@ export class SkillsCliService {
     }
     args.push('-y', '--json');
 
-    const { stdout, stderr } = await this.runCli(args);
+    await this.runCli(args);
     return {
       success: true,
       message: `Skill "${packageName}" installed successfully.`

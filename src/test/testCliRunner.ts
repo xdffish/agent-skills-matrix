@@ -22,7 +22,12 @@ async function runSelfTest() {
     console.log(`   - Total skills found: ${matrixData.totalSkills}`);
     console.log(`   - Detected active agents: ${matrixData.detectedAgentsCount}`);
 
-    // Print first 5 skills as sample
+    // Print agent counts
+    console.log('\nVerified Ground-Truth Agent Counts:');
+    for (const agent of matrixData.agents.filter(a => a.isDetected)) {
+      const count = matrixData.skills.filter(s => s.agents.includes(agent.name)).length;
+      console.log(`   - ${agent.name.padEnd(16)}: ${count} skills genuinely mounted`);
+    }
     console.log('\nSample Skills Mounted in Matrix:');
     matrixData.skills.slice(0, 5).forEach((skill, idx) => {
       console.log(`   ${idx + 1}. [${skill.name}]`);
