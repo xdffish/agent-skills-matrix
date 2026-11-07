@@ -78,6 +78,14 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
 
           case 'normalizeAllAgentSkills': {
             const { agentId } = data.payload;
+            const choice = await vscode.window.showInformationMessage(
+              `确认将当前 Agent 的所有私有实体技能自动执行「独苗入库 + 冗余转软链」规范化吗？`,
+              { modal: true },
+              '开始规范化',
+              '取消'
+            );
+            if (choice !== '开始规范化') return;
+
             this.sendMessage({ type: 'setLoading', loading: true, text: `Normalizing all skills for ${agentId}...` });
             const res = await this._cliService.normalizeAllAgentSkills(agentId);
             this.sendMessage({ type: 'notify', status: 'success', message: res.message });
@@ -87,6 +95,14 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
 
           case 'deletePrivateSkill': {
             const { skillName, agentId } = data.payload;
+            const choice = await vscode.window.showWarningMessage(
+              `⚠️ 警告：该技能「${skillName}」在当前 Agent 目录下为实体文件。删除后将彻底物理销毁！确认删除吗？`,
+              { modal: true },
+              '彻底删除',
+              '取消'
+            );
+            if (choice !== '彻底删除') return;
+
             this.sendMessage({ type: 'setLoading', loading: true, text: `Deleting ${skillName}...` });
             const res = await this._cliService.deletePrivateSkill(skillName, agentId);
             this.sendMessage({ type: 'notify', status: 'info', message: res.message });
@@ -104,6 +120,14 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
 
           case 'removePublicSkill': {
             const { skillName } = data.payload;
+            const choice = await vscode.window.showWarningMessage(
+              `⚠️ 警告：确认将「${skillName}」从公共池完全物理删除并解除所有 Agent 挂载吗？`,
+              { modal: true },
+              '确认删除',
+              '取消'
+            );
+            if (choice !== '确认删除') return;
+
             this.sendMessage({ type: 'setLoading', loading: true, text: `Removing ${skillName} from Central Pool...` });
             const res = await this._cliService.removePublicSkill(skillName);
             this.sendMessage({ type: 'notify', status: 'info', message: res.message });

@@ -277,9 +277,7 @@ function bindPublicEvents() {
   mainContent.querySelectorAll<HTMLElement>('[data-action="delete-public"]').forEach(el => {
     el.addEventListener('click', () => {
       const skillName = el.getAttribute('data-skill')!;
-      if (confirm(`⚠️ 危险操作：确认将「${skillName}」从公共池完全物理删除并解除所有 Agent 挂载吗？`)) {
-        vscode.postMessage({ type: 'removePublicSkill', payload: { skillName } });
-      }
+      vscode.postMessage({ type: 'removePublicSkill', payload: { skillName } });
     });
   });
 }
@@ -490,9 +488,7 @@ function bindAgentEvents(agentId: string) {
 
   mainContent.querySelectorAll<HTMLElement>('[data-action="normalize-all"]').forEach(el => {
     el.addEventListener('click', () => {
-      if (confirm(`确认将当前 Agent 的所有私有实体技能自动执行「独苗入库 + 冗余转软链」规范化吗？`)) {
-        vscode.postMessage({ type: 'normalizeAllAgentSkills', payload: { agentId } });
-      }
+      vscode.postMessage({ type: 'normalizeAllAgentSkills', payload: { agentId } });
     });
   });
 
@@ -505,21 +501,15 @@ function bindAgentEvents(agentId: string) {
   mainContent.querySelectorAll<HTMLElement>('[data-action="delete-private"]').forEach(el => {
     el.addEventListener('click', () => {
       const skillName = el.getAttribute('data-skill')!;
-      const kind = el.getAttribute('data-kind')!;
-      let msg = `确认删除私有技能「${skillName}」吗？`;
-      if (kind === 'unique') msg = `⚠️ 警告：该技能仅存在于当前 Agent，公共池无备份。删除后将彻底丢失！确认删除吗？`;
-      if (confirm(msg)) {
-        vscode.postMessage({ type: 'deletePrivateSkill', payload: { skillName, agentId, kind: 'unique_physical' } });
-      }
+      const kind = (el.getAttribute('data-kind') || 'unique_physical') as any;
+      vscode.postMessage({ type: 'deletePrivateSkill', payload: { skillName, agentId, kind } });
     });
   });
 
   mainContent.querySelectorAll<HTMLElement>('[data-action="delete-public"]').forEach(el => {
     el.addEventListener('click', () => {
       const skillName = el.getAttribute('data-skill')!;
-      if (confirm(`⚠️ 确认将「${skillName}」从公共池完全物理删除并解除所有 Agent 挂载吗？`)) {
-        vscode.postMessage({ type: 'removePublicSkill', payload: { skillName } });
-      }
+      vscode.postMessage({ type: 'removePublicSkill', payload: { skillName } });
     });
   });
 }
