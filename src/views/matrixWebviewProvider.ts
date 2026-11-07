@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { SkillsCliService } from '../services/skillsCliService';
 import {
   ExtensionToWebviewMsg,
@@ -53,7 +55,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
             const { skillName } = data.payload;
             this.sendMessage({ type: 'setLoading', loading: true, text: `Mounting ${skillName} to all agents...` });
             const res = await this._cliService.mountAllAgents(skillName);
-            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
             await this.refresh();
             break;
           }
@@ -62,7 +64,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
             const { skillName, agentId } = data.payload;
             this.sendMessage({ type: 'setLoading', loading: true, text: `Promoting ${skillName} to Central Pool...` });
             const res = await this._cliService.promotePrivateSkill(skillName, agentId);
-            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
             await this.refresh();
             break;
           }
@@ -71,7 +73,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
             const { skillName, agentId } = data.payload;
             this.sendMessage({ type: 'setLoading', loading: true, text: `Deduplicating ${skillName}...` });
             const res = await this._cliService.deduplicatePrivateSkill(skillName, agentId);
-            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
             await this.refresh();
             break;
           }
@@ -88,7 +90,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
 
             this.sendMessage({ type: 'setLoading', loading: true, text: `Normalizing all skills for ${agentId}...` });
             const res = await this._cliService.normalizeAllAgentSkills(agentId);
-            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
             await this.refresh();
             break;
           }
@@ -130,7 +132,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
 
             this.sendMessage({ type: 'setLoading', loading: true, text: `Removing ${skillName} from Central Pool...` });
             const res = await this._cliService.removePublicSkill(skillName);
-            this.sendMessage({ type: 'notify', status: 'info', message: res.message });
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
             await this.refresh();
             break;
           }
@@ -139,15 +141,51 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
             const { packageName, agents } = data.payload;
             this.sendMessage({ type: 'setLoading', loading: true, text: `Installing ${packageName}...` });
             const res = await this._cliService.installSkill(packageName, agents);
-            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            if (res.needsSelection) {
+              const matrix = await this._cliService.getMatrixData();
+              const selected = await vscode.window.showQuickPick(matrix.publicSkills.map(skill => ({ label: skill.name })), {
+                canPickMany: true,
+                title: '未发现新增技能，请选择要挂载的现有公共技能',
+                placeHolder: '确认技能属于该安装包后选择；取消则不挂载'
+              });
+              if (selected?.length) {
+                const failures: string[] = [];
+                let count = 0;
+                for (const skill of selected) for (const agent of agents) {
+                  try { await this._cliService.toggleAgentSkill(skill.label, agent, true); count++; }
+                  catch (err: any) { failures.push(`${agent}/${skill.label}: ${err.message}`); }
+                }
+                this.sendMessage({ type: 'notify', status: failures.length ? 'error' : 'success', message: `已完成 ${count} 个挂载。${failures.length ? `失败：${failures.join('；')}` : ''}` });
+              } else {
+                this.sendMessage({ type: 'notify', status: 'info', message: '未选择现有技能，未执行额外挂载。' });
+              }
+              await this.refresh();
+              break;
+            }
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
             await this.refresh();
             break;
           }
 
           case 'openSkillFile': {
             if (data.payload.skillPath) {
-              const uri = vscode.Uri.file(data.payload.skillPath);
-              vscode.commands.executeCommand('vscode.open', uri);
+              const dir = path.dirname(data.payload.skillPath);
+              let entry: string | undefined;
+              for (const name of ['SKILL.md', 'skill.md', 'README.md']) {
+                const candidate = path.join(dir, name);
+                try {
+                  if ((await fs.promises.stat(candidate)).isFile()) { entry = candidate; break; }
+                } catch (err: any) {
+                  if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR') throw err;
+                }
+              }
+              if (entry) {
+                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(entry));
+              } else {
+                const stat = await fs.promises.stat(dir);
+                if (!stat.isDirectory()) throw new Error(`技能目录不存在：${dir}`);
+                await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(dir));
+              }
             }
             break;
           }
@@ -155,7 +193,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
           case 'fixYamlSyntax': {
             const { skillPath } = data.payload;
             const res = this._cliService.fixYamlSyntax(skillPath);
-            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
             await this.refresh();
             break;
           }
@@ -174,6 +212,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
           message: err?.message || 'Operation failed'
         });
         this.sendMessage({ type: 'setLoading', loading: false });
+        await this.refresh();
       }
     });
   }

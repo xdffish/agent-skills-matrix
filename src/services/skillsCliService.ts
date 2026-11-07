@@ -113,6 +113,21 @@ function safeSymlink(target: string, linkPath: string): void {
   fs.symlinkSync(target, linkPath, symlinkType);
 }
 
+function pointsTo(link: string, target: string): boolean {
+  try {
+    if (path.resolve(path.dirname(link), fs.readlinkSync(link)) === path.resolve(target)) return true;
+    return fs.realpathSync(link) === fs.realpathSync(target);
+  } catch { return false; }
+}
+function identicalTrees(a: string, b: string): boolean {
+  const x = fs.lstatSync(a), y = fs.lstatSync(b);
+  if (x.isSymbolicLink() || y.isSymbolicLink()) return false;
+  if (x.isFile() && y.isFile()) return x.size === y.size && fs.readFileSync(a).equals(fs.readFileSync(b));
+  if (!x.isDirectory() || !y.isDirectory()) return false;
+  const aa = fs.readdirSync(a).sort(), bb = fs.readdirSync(b).sort();
+  return aa.length === bb.length && aa.every((n, i) => n === bb[i] && identicalTrees(path.join(a, n), path.join(b, n)));
+}
+
 export class SkillsCliService {
   private homedir: string;
   private centralDir: string;
@@ -125,12 +140,12 @@ export class SkillsCliService {
   public detectAgents(): AgentDefinition[] {
     return KNOWN_AGENTS_CONFIG.map(cfg => {
       let fullPath = path.join(this.homedir, cfg.relDir);
-      if (cfg.id === 'copilot' && !fs.existsSync(fullPath)) {
+      if (cfg.id === 'copilot') {
         const ghSkills = path.join(this.homedir, '.github', 'skills');
         if (fs.existsSync(ghSkills)) fullPath = ghSkills;
+        else if (!fs.existsSync(fullPath)) fullPath = path.join(this.homedir, '.copilot', 'skills');
       }
-      const parentDir = path.dirname(fullPath);
-      const isDetected = fs.existsSync(fullPath) || fs.existsSync(parentDir);
+      const isDetected = fs.existsSync(fullPath);
       return {
         id: cfg.id,
         name: cfg.name,
@@ -146,8 +161,25 @@ export class SkillsCliService {
 
   public async runCli(args: string[]): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-      const proc = childProcess.spawn(npxCmd, ['skills', ...args], {
+      let command = 'npx';
+      let commandArgs = ['--yes', 'skills', ...args];
+      if (process.platform === 'win32') {
+        const appData = process.env.APPDATA || path.join(this.homedir, 'AppData', 'Roaming');
+        const candidates = [
+          path.join(appData, 'npm', 'node_modules', 'npm', 'bin', 'npx-cli.js'),
+          path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js'),
+          path.join(path.dirname(path.dirname(process.execPath)), 'node_modules', 'npm', 'bin', 'npx-cli.js')
+        ];
+        const npxCli = candidates.find(candidate => fs.existsSync(candidate));
+        if (!npxCli) {
+          reject(new Error('找不到 npm 的 npx-cli.js。请确认 Node.js/npm 已安装，并重启编辑器后重试。'));
+          return;
+        }
+        command = process.execPath;
+        commandArgs = [npxCli, '--yes', 'skills', ...args];
+      }
+      const proc = childProcess.spawn(command, commandArgs, {
+        shell: false,
         env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' }
       });
       let stdout = '';
@@ -155,7 +187,7 @@ export class SkillsCliService {
       proc.stdout.on('data', data => { stdout += data.toString(); });
       proc.stderr.on('data', data => { stderr += data.toString(); });
       const timer = setTimeout(() => {
-        proc.kill('SIGKILL');
+        proc.kill();
         reject(new Error(`Command timed out: npx skills ${args.join(' ')}`));
       }, 30000);
       proc.on('close', code => {
@@ -269,6 +301,8 @@ export class SkillsCliService {
           if (aStat.isSymbolicLink()) {
             if (!fs.existsSync(agentSkillPath)) {
               agentStates[agent.id] = 'broken';
+            } else if (!pointsTo(agentSkillPath, fullPath)) {
+              agentStates[agent.id] = 'external';
             } else {
               agentStates[agent.id] = 'linked';
               mountedCount++;
@@ -325,7 +359,7 @@ export class SkillsCliService {
                 kind: 'broken_symlink',
                 symlinkTarget: target
               });
-            } else if (target.includes('.agents/skills') || publicNamesSet.has(item)) {
+            } else if (publicNamesSet.has(item) && pointsTo(p, path.join(this.centralDir, item))) {
               linkedCount++;
             } else {
               privateSkills.push({
@@ -509,7 +543,9 @@ export class SkillsCliService {
                     const rel = path.relative(codexCacheDir, full);
                     const parts = rel.split(path.sep);
                     const group = parts[0] || 'plugin';
-                    const pkg = parts[1] || entry.name;
+                    const pkg = group === 'openai-curated-remote' && parts.length > 3
+                      ? parts.slice(1, -2).join('/')
+                      : parts[1] || entry.name;
                     let badgeText = `Codex Plugin (${pkg})`;
                     let category: 'builtin' | 'plugin' | 'runtime' = 'plugin';
                     if (group === 'openai-primary-runtime') {
@@ -524,12 +560,12 @@ export class SkillsCliService {
                     }
                     const desc = this.extractSkillDescription(full).description;
                     builtinSkills.push({
-                      name: entry.name,
+                      name: `${pkg}:${entry.name}`,
                       agentId: agent.id,
                       path: full,
                       category,
                       badgeText,
-                      description: getLocalizedDescription(entry.name, desc)
+                      description: desc
                     });
                   } else {
                     scanCodexCache(full, depth + 1);
@@ -655,6 +691,7 @@ export class SkillsCliService {
     const centralSkillPath = path.join(this.centralDir, skillName);
 
     const existingStat = safeLstat(agentSkillPath);
+    if (existingStat?.isSymbolicLink() && !pointsTo(agentSkillPath, centralSkillPath)) throw new Error(`同名链接 ${skillName} 不指向公共池，已保留。`);
 
     if (enable) {
       if (!fs.existsSync(centralSkillPath)) {
@@ -662,7 +699,7 @@ export class SkillsCliService {
       }
       if (existingStat) {
         if (existingStat.isSymbolicLink()) {
-          try { fs.unlinkSync(agentSkillPath); } catch {}
+          return { success: true, message: `${skillName} 已挂载至 ${targetAgent.name}。` };
         } else {
           throw new Error(`${skillName} is a physical directory in ${targetAgent.name}. Please promote or convert it first.`);
         }
@@ -672,7 +709,7 @@ export class SkillsCliService {
     } else {
       if (existingStat) {
         if (existingStat.isSymbolicLink()) {
-          try { fs.unlinkSync(agentSkillPath); } catch {}
+          fs.unlinkSync(agentSkillPath);
         } else {
           throw new Error(`${skillName} is a physical directory in ${targetAgent.name}. Use dedicated agent view to promote or delete.`);
         }
@@ -684,12 +721,13 @@ export class SkillsCliService {
   public async mountAllAgents(skillName: string): Promise<{ success: boolean; message: string }> {
     const agents = this.detectAgents();
     let count = 0;
+    const failures: string[] = [];
     for (const a of agents) {
       if (!a.isDetected) continue;
-      await this.toggleAgentSkill(skillName, a.id, true);
-      count++;
+      try { await this.toggleAgentSkill(skillName, a.id, true); count++; }
+      catch (err: any) { failures.push(`${a.name}: ${err.message}`); }
     }
-    return { success: true, message: `Mounted ${skillName} to all ${count} active agents.` };
+    return { success: failures.length === 0, message: `已挂载 ${count} 个 Agent。${failures.length ? `失败：${failures.join('；')}` : ''}` };
   }
 
   public async promotePrivateSkill(skillName: string, agentId: string): Promise<{ success: boolean; message: string }> {
@@ -701,10 +739,11 @@ export class SkillsCliService {
     const destPath = path.join(this.centralDir, skillName);
 
     if (!fs.existsSync(sourcePath)) throw new Error(`Source skill not found: ${sourcePath}`);
-    if (fs.existsSync(destPath)) throw new Error(`Skill "${skillName}" already exists in central pool.`);
+    if (safeLstat(destPath)) throw new Error(`Skill "${skillName}" already exists in central pool.`);
 
+    if (!safeLstat(sourcePath)?.isDirectory()) throw new Error('仅可收编实体目录');
     fs.renameSync(sourcePath, destPath);
-    safeSymlink(destPath, sourcePath);
+    try { safeSymlink(destPath, sourcePath); } catch (err) { fs.renameSync(destPath, sourcePath); throw err; }
 
     return { success: true, message: `Successfully promoted "${skillName}" to Central Pool and converted to symlink!` };
   }
@@ -721,12 +760,13 @@ export class SkillsCliService {
       throw new Error(`Central skill ${skillName} does not exist. Cannot deduplicate.`);
     }
 
-    if (fs.existsSync(sourcePath)) {
-      fs.rmSync(sourcePath, { recursive: true, force: true });
-    }
-    safeSymlink(centralPath, sourcePath);
+    if (!safeLstat(sourcePath)?.isDirectory() || !identicalTrees(sourcePath, fs.realpathSync(centralPath))) throw new Error(`同名技能内容不同或包含软链接，已保留：${skillName}`);
+    const backup = fs.mkdtempSync(path.join(path.dirname(sourcePath), '.skills-matrix-backup-'));
+    const saved = path.join(backup, skillName);
+    fs.renameSync(sourcePath, saved);
+    try { safeSymlink(centralPath, sourcePath); } catch (err) { fs.renameSync(saved, sourcePath); fs.rmdirSync(backup); throw err; }
 
-    return { success: true, message: `Replaced physical duplicate "${skillName}" with standard central symlink.` };
+    return { success: true, message: `已转换 ${skillName}；原目录备份于 ${saved}` };
   }
 
   public async normalizeAllAgentSkills(agentId: string): Promise<{ success: boolean; message: string }> {
@@ -737,7 +777,9 @@ export class SkillsCliService {
     let promoted = 0;
     let deduped = 0;
 
+    const failures: string[] = [];
     for (const item of detail.privateSkills) {
+      try {
       if (item.kind === 'unique_physical') {
         await this.promotePrivateSkill(item.name, agentId);
         promoted++;
@@ -745,10 +787,11 @@ export class SkillsCliService {
         await this.deduplicatePrivateSkill(item.name, agentId);
         deduped++;
       }
+      } catch (err: any) { failures.push(`${item.name}: ${err.message}`); }
     }
     return {
-      success: true,
-      message: `Normalized ${targetName(agentId)}: ${promoted} promoted to central pool, ${deduped} converted to symlinks.`
+      success: failures.length === 0,
+      message: `已收编 ${promoted}，转换 ${deduped}。${failures.length ? `未完成：${failures.join('；')}` : ''}`
     };
   }
 
@@ -796,56 +839,35 @@ export class SkillsCliService {
   public async removePublicSkill(skillName: string): Promise<{ success: boolean; message: string }> {
     if (PROTECTED_NAMES.has(skillName)) throw new Error(`Cannot delete protected component`);
     const agents = this.detectAgents();
+    const removed: string[] = [];
+    const failures: string[] = [];
     for (const a of agents) {
       if (!a.isDetected) continue;
       const ap = path.join(a.fullSkillsDir, skillName);
       const stat = safeLstat(ap);
-      if (stat && stat.isSymbolicLink()) {
-        try { fs.unlinkSync(ap); } catch {}
+      if (stat && stat.isSymbolicLink() && pointsTo(ap, path.join(this.centralDir, skillName))) {
+        try { fs.unlinkSync(ap); removed.push(a.name); }
+        catch (err: any) { failures.push(`${a.name}: ${err.message}`); }
       }
     }
     const centralP = path.join(this.centralDir, skillName);
-    if (fs.existsSync(centralP)) {
-      fs.rmSync(centralP, { recursive: true, force: true });
+    if (failures.length) {
+      return { success: false, message: `已解除 ${removed.length} 个挂载；公共技能已保留。失败：${failures.join('；')}` };
     }
-    return { success: true, message: `Completely removed "${skillName}" from central pool and all agents.` };
+    try { if (safeLstat(centralP)) fs.rmSync(centralP, { recursive: true, force: true }); }
+    catch (err: any) { return { success: false, message: `已解除 ${removed.length} 个挂载；删除公共技能失败：${err.message}` }; }
+    return { success: true, message: `已删除公共技能 ${skillName}，解除 ${removed.length} 个挂载。` };
   }
 
-  public async installSkill(packageName: string, agents: string[]): Promise<{ success: boolean; message: string }> {
-    // Snapshot existing central skills to accurately detect newly installed folders
-    const beforeSkills = new Set<string>();
-    if (fs.existsSync(this.centralDir)) {
-      try {
-        fs.readdirSync(this.centralDir).forEach(item => beforeSkills.add(item));
-      } catch {}
+  public async installSkill(packageName: string, agents: string[]): Promise<{ success: boolean; message: string; needsSelection?: boolean }> {
+    const before = new Set(fs.existsSync(this.centralDir) ? fs.readdirSync(this.centralDir) : []);
+    await this.runCli(['add', packageName, '-g', '-y', '--json']);
+    const added = fs.existsSync(this.centralDir) ? fs.readdirSync(this.centralDir).filter(n => !before.has(n) && fs.existsSync(path.join(this.centralDir, n, 'SKILL.md'))) : [];
+    const failures: string[] = [];
+    for (const a of agents) for (const name of added) {
+      try { await this.toggleAgentSkill(name, a, true); } catch (err: any) { failures.push(`${a}/${name}: ${err.message}`); }
     }
-
-    const args = ['add', packageName, '-g', '-y', '--json'];
-    await this.runCli(args);
-
-    // Find newly added skills in central pool
-    const newlyAdded: string[] = [];
-    if (fs.existsSync(this.centralDir)) {
-      try {
-        fs.readdirSync(this.centralDir).forEach(item => {
-          if (!beforeSkills.has(item) && !item.startsWith('.')) {
-            newlyAdded.push(item);
-          }
-        });
-      } catch {}
-    }
-
-    const fallbackSkillName = packageName.split('/').pop()?.replace('.git', '') || packageName;
-    const targetSkills = newlyAdded.length > 0 ? newlyAdded : [fallbackSkillName];
-
-    for (const targetSkill of targetSkills) {
-      for (const a of agents) {
-        try {
-          await this.toggleAgentSkill(targetSkill, a, true);
-        } catch {}
-      }
-    }
-    return { success: true, message: `Installed ${packageName} into central pool (${targetSkills.join(', ')}).` };
+    return { success: added.length > 0 && failures.length === 0, needsSelection: added.length === 0 && agents.length > 0, message: added.length ? `新增技能：${added.join('、')}。${failures.length ? `挂载失败：${failures.join('；')}` : ''}` : '安装命令已完成，但未发现新增技能；请核对公共池。' };
   }
 
   public fixYamlSyntax(skillPath: string): { success: boolean; message: string } {

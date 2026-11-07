@@ -255,6 +255,14 @@ body {
 }
 
 .col-skill { min-width: 200px; max-width: 280px; }
+.matrix-table .col-skill {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card-bg);
+  box-shadow: 2px 0 3px var(--vscode-widget-shadow);
+}
+.matrix-table th.col-skill { z-index: 3; }
 .col-agent { text-align: center; min-width: 80px; }
 .col-action { text-align: right; width: 90px; }
 

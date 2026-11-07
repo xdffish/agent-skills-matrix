@@ -2,7 +2,7 @@
  * Comprehensive Data Structures for Agent Skills Matrix (v0.2.0 Dual-Perspective Architecture)
  */
 
-export type MountStatus = 'linked' | 'physical' | 'broken' | 'off';
+export type MountStatus = 'linked' | 'physical' | 'external' | 'broken' | 'off';
 
 export interface AgentDefinition {
   id: string;

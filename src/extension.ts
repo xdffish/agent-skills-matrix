@@ -31,12 +31,10 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register Open / Focus Command
+  // Open the dashboard in the wide editor area instead of the narrow sidebar.
   context.subscriptions.push(
     vscode.commands.registerCommand('agent-skills-matrix.open', () => {
-      vscode.commands.executeCommand(
-        'workbench.view.extension.agent-skills-matrix-container'
-      );
+      vscode.commands.executeCommand('agent-skills-matrix.view.focus');
     })
   );
 

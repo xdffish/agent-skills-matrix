@@ -14,6 +14,14 @@ declare function acquireVsCodeApi(): {
 };
 
 const vscode = acquireVsCodeApi();
+const collapsedSections: Record<string, boolean> = {};
+const compareNames = (a: { name: string; path: string }, b: { name: string; path: string }): number =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }) || a.path.localeCompare(b.path);
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
+}
+
 
 interface WebviewState {
   currentPerspective: string; // 'public', 'marketplace', or agent.id
@@ -112,7 +120,7 @@ function closeAddModal() { addModal.classList.remove('open'); }
 function showToast(status: 'info' | 'success' | 'warning' | 'error', message: string) {
   const t = document.createElement('div');
   t.className = `toast ${status}`;
-  t.innerHTML = `<span>${status === 'success' ? '✓' : status === 'error' ? '✕' : 'ℹ'}</span><span>${message}</span>`;
+  t.innerHTML = `<span>${status === 'success' ? '✓' : status === 'error' ? '✕' : 'ℹ'}</span><span>${escapeHtml(message)}</span>`;
   toastContainer.appendChild(t);
   setTimeout(() => {
     t.style.opacity = '0';
@@ -162,7 +170,7 @@ function renderTabs() {
     tab.innerHTML = `
       <span class="tab-dot" style="background:${agent.color}"></span>
       <span>${agent.name}</span>
-      <span class="tab-badge">${totalActive}</span>
+      <span class="tab-badge" title="本地技能条目 / 发现的内置及插件条目">${totalActive} + ${detail?.builtinCount ?? 0}</span>
     `;
     tab.addEventListener('click', () => {
       state.currentPerspective = agent.id;
@@ -195,7 +203,7 @@ function renderPublicView() {
     if (!state.searchQuery) return true;
     return s.name.toLowerCase().includes(state.searchQuery) ||
            (s.description || '').toLowerCase().includes(state.searchQuery);
-  });
+  }).sort(compareNames);
 
   headerBadge.textContent = `${filtered.length} / ${publicSkills.length} 公共技能`;
 
@@ -224,11 +232,11 @@ function renderPublicView() {
         <td class="col-skill">
           <div class="skill-info">
             <div class="skill-title-row">
-              <span class="skill-title" data-path="${skill.path}">${skill.name}</span>
-              ${skill.hasYamlError ? `<span class="badge-tag badge-warning" title="${skill.yamlErrorMsg || 'YAML format warning'}">⚠️ YAML语法</span>` : ''}
-              ${skill.isSymlinkInCentral ? `<span class="badge-tag badge-info" title="${skill.centralTarget}">外部软链</span>` : ''}
+              <span class="skill-title" data-path="${escapeHtml(skill.path)}">${escapeHtml(skill.name)}</span>
+              ${skill.hasYamlError ? `<span class="badge-tag badge-warning" title="${escapeHtml(skill.yamlErrorMsg || 'YAML format warning')}">⚠️ YAML语法</span>` : ''}
+              ${skill.isSymlinkInCentral ? `<span class="badge-tag badge-info" title="${escapeHtml(skill.centralTarget)}">外部软链</span>` : ''}
             </div>
-            ${skill.description ? `<span class="skill-desc-text" title="${skill.description}">${skill.description}</span>` : ''}
+            ${skill.description ? `<span class="skill-desc-text" title="${escapeHtml(skill.description)}">${escapeHtml(skill.description)}</span>` : ''}
           </div>
         </td>
     `;
@@ -236,21 +244,23 @@ function renderPublicView() {
     detectedAgents.forEach(a => {
       const st = skill.agentStates[a.id] || 'off';
       if (st === 'linked') {
-        html += `<td class="col-agent"><span class="toggle-pill linked" data-action="toggle" data-skill="${skill.name}" data-agent="${a.id}" data-enable="false" title="已挂载软链，点击停用">ON</span></td>`;
+        html += `<td class="col-agent"><span class="toggle-pill linked" data-action="toggle" data-skill="${escapeHtml(skill.name)}" data-agent="${a.id}" data-enable="false" title="已挂载软链，点击停用">ON</span></td>`;
+      } else if (st === 'external') {
+        html += `<td class="col-agent"><span class="toggle-pill physical" title="同名链接指向其他位置，未由公共池管理">外部链接</span></td>`;
       } else if (st === 'physical') {
         html += `<td class="col-agent"><span class="toggle-pill physical" title="当前为Agent私有实体文件夹，点击切换至该Agent视图进行治理" data-action="goto-agent" data-agent="${a.id}">🟠实体</span></td>`;
       } else if (st === 'broken') {
         html += `<td class="col-agent"><span class="toggle-pill broken" title="失效死链">⚠️死链</span></td>`;
       } else {
-        html += `<td class="col-agent"><span class="toggle-pill off" data-action="toggle" data-skill="${skill.name}" data-agent="${a.id}" data-enable="true" title="未挂载，点击一键软链开启">OFF</span></td>`;
+        html += `<td class="col-agent"><span class="toggle-pill off" data-action="toggle" data-skill="${escapeHtml(skill.name)}" data-agent="${a.id}" data-enable="true" title="未挂载，点击一键软链开启">OFF</span></td>`;
       }
     });
 
     html += `
         <td class="col-action">
-          <button class="btn btn-secondary btn-sm" data-action="mount-all" data-skill="${skill.name}" title="一键全选挂载给所有已激活的 Agent">⚡全选</button>
-          ${skill.hasYamlError ? `<button class="btn btn-warning btn-sm" data-action="fix-yaml" data-path="${skill.path}" data-skill="${skill.name}" title="自动修复 SKILL.md 中的 YAML 语法">🔧修复</button>` : ''}
-          <button class="btn btn-danger btn-sm" data-action="delete-public" data-skill="${skill.name}" title="彻底从全机公共池与所有 Agent 中移除">🗑</button>
+          <button class="btn btn-secondary btn-sm" data-action="mount-all" data-skill="${escapeHtml(skill.name)}" title="一键全选挂载给所有已激活的 Agent">⚡全选</button>
+          ${skill.hasYamlError ? `<button class="btn btn-warning btn-sm" data-action="fix-yaml" data-path="${escapeHtml(skill.path)}" data-skill="${escapeHtml(skill.name)}" title="自动修复 SKILL.md 中的 YAML 语法">🔧修复</button>` : ''}
+          <button class="btn btn-danger btn-sm" data-action="delete-public" data-skill="${escapeHtml(skill.name)}" title="彻底从全机公共池与所有 Agent 中移除">🗑</button>
         </td>
       </tr>
     `;
@@ -419,8 +429,8 @@ function renderMarketplaceView() {
               </button>
             ` : ''}
             ${isInstalled ? `
-              <button class="btn btn-secondary btn-sm" style="color:var(--success-color, #10B981); cursor:default;" title="该技能已存在于本机公共技能库中">
-                ✓ 已收录
+              <button class="btn btn-secondary btn-sm" data-action="install-market" data-pkg="${item.packageRef}" title="选择 Agent 并确认要挂载的公共技能">
+                ✓ 已收录 · 挂载
               </button>
             ` : `
               <button class="btn btn-primary btn-sm" data-action="install-market" data-pkg="${item.packageRef}" title="一键收录至公共库并选择挂载 Agent">
@@ -476,15 +486,15 @@ function renderDedicatedAgentView(agentId: string) {
   const { agent, privateSkills, builtinSkills, linkedCount, brokenCount, totalActiveCount } = detail;
   const { publicSkills } = state.matrixData!;
 
-  headerBadge.textContent = `${agent.name} 专属工作台 (${totalActiveCount} 个活跃技能)`;
+  headerBadge.textContent = `${agent.name} 专属工作台（本地 ${totalActiveCount}，内置及插件 ${builtinSkills.length}）`;
 
   let html = `
     <div class="agent-view-container">
       <!-- Agent Meta Banner -->
       <div class="agent-meta-banner">
         <div class="agent-meta-info">
-          <div><strong style="color:${agent.color}">● ${agent.name}</strong> • 活跃技能总数: <strong>${totalActiveCount}</strong></div>
-          <div class="agent-meta-path">物理目录: ${agent.fullSkillsDir}</div>
+          <div><strong style="color:${agent.color}">● ${agent.name}</strong> • 本地技能条目: <strong>${totalActiveCount}</strong> • 发现的内置及插件条目: <strong>${builtinSkills.length}</strong></div>
+          <div class="agent-meta-path">物理目录: ${escapeHtml(agent.fullSkillsDir)}</div>
         </div>
         <div class="action-buttons">
           ${brokenCount > 0 ? `<button class="btn btn-warning btn-sm" data-action="clean-broken" data-agent="${agent.id}">🧹 清理 ${brokenCount} 个失效死链</button>` : ''}
@@ -498,7 +508,7 @@ function renderDedicatedAgentView(agentId: string) {
   // -----------------------------------------------------------
   if (privateSkills.length > 0) {
     html += `
-      <div class="section-card">
+      <div class="section-card ${collapsedSections[`${agentId}:private`] ? 'collapsed' : ''}" data-section="private">
         <div class="section-header" data-action="toggle-section" title="点击折叠/展开本分区">
           <div class="section-title-wrap">
             <span class="section-collapse-indicator">▾</span>
@@ -510,29 +520,29 @@ function renderDedicatedAgentView(agentId: string) {
         <div class="section-body">
     `;
 
-    privateSkills.forEach(item => {
+    [...privateSkills].sort(compareNames).forEach(item => {
       html += `
         <div class="agent-skill-row">
           <div class="skill-main-info">
             <div class="skill-title-row">
-              <span class="skill-title" data-path="${item.path}">📁 ${item.name}</span>
+              <span class="skill-title" data-path="${escapeHtml(item.path)}">📁 ${escapeHtml(item.name)}</span>
               ${item.kind === 'unique_physical' ? `<span class="badge-tag badge-warning">独苗: 公共池未收录</span>` : ''}
               ${item.kind === 'duplicate_physical' ? `<span class="badge-tag badge-info">冗余副本: 公共池已有</span>` : ''}
               ${item.kind === 'broken_symlink' ? `<span class="badge-tag badge-danger">失效死链</span>` : ''}
             </div>
-            ${item.description ? `<span class="skill-desc-text">${item.description}</span>` : ''}
+            ${item.description ? `<span class="skill-desc-text">${escapeHtml(item.description)}</span>` : ''}
           </div>
           <div class="skill-row-actions">
             ${item.kind === 'unique_physical' ? `
-              <button class="btn btn-success btn-sm" data-action="promote-private" data-skill="${item.name}" data-agent="${agent.id}">📥 收编入公共池</button>
-              <button class="btn btn-danger btn-sm" data-action="delete-private" data-skill="${item.name}" data-agent="${agent.id}" data-kind="unique">🗑 删除独苗</button>
+              <button class="btn btn-success btn-sm" data-action="promote-private" data-skill="${escapeHtml(item.name)}" data-agent="${agent.id}">📥 收编入公共池</button>
+              <button class="btn btn-danger btn-sm" data-action="delete-private" data-skill="${escapeHtml(item.name)}" data-agent="${agent.id}" data-kind="unique">🗑 删除独苗</button>
             ` : ''}
             ${item.kind === 'duplicate_physical' ? `
-              <button class="btn btn-info btn-sm" data-action="dedup-private" data-skill="${item.name}" data-agent="${agent.id}">🔄 转为公共软链</button>
-              <button class="btn btn-danger btn-sm" data-action="delete-private" data-skill="${item.name}" data-agent="${agent.id}" data-kind="dup">🗑 删此副本</button>
+              <button class="btn btn-info btn-sm" data-action="dedup-private" data-skill="${escapeHtml(item.name)}" data-agent="${agent.id}">🔄 转为公共软链</button>
+              <button class="btn btn-danger btn-sm" data-action="delete-private" data-skill="${escapeHtml(item.name)}" data-agent="${agent.id}" data-kind="dup">🗑 删此副本</button>
             ` : ''}
             ${item.kind === 'broken_symlink' ? `
-              <button class="btn btn-danger btn-sm" data-action="delete-private" data-skill="${item.name}" data-agent="${agent.id}" data-kind="broken">🧹 清理死链</button>
+              <button class="btn btn-danger btn-sm" data-action="delete-private" data-skill="${escapeHtml(item.name)}" data-agent="${agent.id}" data-kind="broken">🧹 清理死链</button>
             ` : ''}
           </div>
         </div>
@@ -553,10 +563,10 @@ function renderDedicatedAgentView(agentId: string) {
     if (!state.searchQuery) return true;
     return s.name.toLowerCase().includes(state.searchQuery) ||
            (s.description || '').toLowerCase().includes(state.searchQuery);
-  });
+  }).sort(compareNames);
 
   html += `
-    <div class="section-card">
+    <div class="section-card ${collapsedSections[`${agentId}:public`] ? 'collapsed' : ''}" data-section="public">
       <div class="section-header" data-action="toggle-section" title="点击折叠/展开本分区">
         <div class="section-title-wrap">
           <span class="section-collapse-indicator">▾</span>
@@ -581,21 +591,23 @@ function renderDedicatedAgentView(agentId: string) {
     `;
   } else {
     filteredPublic.forEach(skill => {
-      const isMounted = skill.agentStates[agent.id] === 'linked';
+      const mountStatus = skill.agentStates[agent.id] || 'off';
+      const isMounted = mountStatus === 'linked';
+      const label = ({ linked: '已软链', off: '未挂载', external: '同名外部链接', physical: '同名实体目录', broken: '失效链接' })[mountStatus];
       html += `
         <div class="agent-skill-row">
           <div class="skill-main-info">
             <div class="skill-title-row">
-              <span class="skill-title" data-path="${skill.path}">${isMounted ? '🔗' : '⚪'} ${skill.name}</span>
-              <span class="badge-tag ${isMounted ? 'badge-info' : ''}">${isMounted ? '已软链' : '未挂载'}</span>
+              <span class="skill-title" data-path="${escapeHtml(skill.path)}">${isMounted ? '🔗' : '⚪'} ${escapeHtml(skill.name)}</span>
+              <span class="badge-tag ${isMounted ? 'badge-info' : ''}">${label}</span>
             </div>
-            ${skill.description ? `<span class="skill-desc-text">${skill.description}</span>` : ''}
+            ${skill.description ? `<span class="skill-desc-text">${escapeHtml(skill.description)}</span>` : ''}
           </div>
           <div class="skill-row-actions">
-            <span class="toggle-pill ${isMounted ? 'linked' : 'off'}" data-action="toggle" data-skill="${skill.name}" data-agent="${agent.id}" data-enable="${!isMounted}">
+            ${mountStatus === 'linked' || mountStatus === 'off' ? `<span class="toggle-pill ${isMounted ? 'linked' : 'off'}" data-action="toggle" data-skill="${escapeHtml(skill.name)}" data-agent="${agent.id}" data-enable="${!isMounted}">
               ${isMounted ? '🟢 已启用' : '⚪ 未启用'}
-            </span>
-            <button class="btn btn-danger btn-sm" data-action="delete-public" data-skill="${skill.name}" title="从公共池彻底移除该技能">🗑 全局删除</button>
+            </span>` : `<span class="toggle-pill physical" title="请先在私有技能分区处理冲突">${label}</span>`}
+            <button class="btn btn-danger btn-sm" data-action="delete-public" data-skill="${escapeHtml(skill.name)}" title="从公共池彻底移除该技能">🗑 全局删除</button>
           </div>
         </div>
       `;
@@ -608,31 +620,36 @@ function renderDedicatedAgentView(agentId: string) {
   // Partition 3: Built-in & Plugins (Read-only)
   // -----------------------------------------------------------
   if (builtinSkills.length > 0) {
+    const query = state.searchQuery.replace(/^\$/, '');
+    const filteredBuiltin = builtinSkills.filter(b => !query || [b.name, b.badgeText, b.description || ''].some(value => value.toLowerCase().includes(query)))
+      .sort(compareNames);
+    const builtinCollapsed = !query && (collapsedSections[`${agentId}:builtin`] ?? true);
     html += `
-      <div class="section-card collapsed">
+      <div class="section-card ${builtinCollapsed ? 'collapsed' : ''}" data-section="builtin">
         <div class="section-header" data-action="toggle-section" title="点击折叠/展开本分区">
           <div class="section-title-wrap">
             <span class="section-collapse-indicator">▾</span>
             <span>🔒</span>
-            <span class="section-title">分区三：宿主系统内置与插件托管技能 (${builtinSkills.length})</span>
+            <span class="section-title">分区三：宿主系统内置与插件托管技能 (${query ? `${filteredBuiltin.length} / ` : ''}${builtinSkills.length})</span>
           </div>
           <span style="font-size:11px;color:var(--muted)">系统核心/插件扩展，只读防呆 (点击展开)</span>
         </div>
         <div class="section-body">
     `;
 
-    builtinSkills.forEach(b => {
+    if (!filteredBuiltin.length) html += `<div class="empty-state">没有匹配的内置或插件技能</div>`;
+    filteredBuiltin.forEach(b => {
       html += `
         <div class="agent-skill-row">
           <div class="skill-main-info">
             <div class="skill-title-row">
-              <span class="skill-title" data-path="${b.path}">🔒 ${b.name}</span>
-              <span class="badge-tag badge-warning">${b.badgeText}</span>
+              <span class="skill-title" data-path="${escapeHtml(b.path)}">🔒 ${agentId === 'codex' && b.name.includes(':') ? '$' : ''}${escapeHtml(b.name)}</span>
+              <span class="badge-tag badge-warning">${escapeHtml(b.badgeText)}</span>
             </div>
-            ${b.description ? `<span class="skill-desc-text">${b.description}</span>` : ''}
+            ${b.description ? `<span class="skill-desc-text">${escapeHtml(b.description)}</span>` : ''}
           </div>
           <div class="skill-row-actions">
-            <button class="btn btn-secondary btn-sm" data-action="view-source" data-path="${b.path}">📖 查看源码</button>
+            <button class="btn btn-secondary btn-sm" data-action="view-source" data-path="${escapeHtml(b.path)}">📖 查看源码</button>
           </div>
         </div>
       `;
@@ -664,6 +681,8 @@ function bindAgentEvents(agentId: string) {
       const card = header.closest('.section-card');
       if (card) {
         card.classList.toggle('collapsed');
+        const section = (card as HTMLElement).dataset.section;
+        if (section) collapsedSections[`${agentId}:${section}`] = card.classList.contains('collapsed');
       }
     });
   });
