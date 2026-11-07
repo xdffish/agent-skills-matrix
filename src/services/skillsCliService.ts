@@ -97,8 +97,21 @@ const KNOWN_AGENTS_CONFIG: Array<{
     relDir: path.join('.hermes', 'skills'),
     color: '#14B8A6',
     accent: 'rgba(20, 184, 166, 0.15)'
+  },
+  {
+    id: 'copilot',
+    name: 'GitHub Copilot',
+    cliArg: 'copilot',
+    relDir: path.join('.copilot', 'skills'),
+    color: '#6366F1',
+    accent: 'rgba(99, 102, 241, 0.15)'
   }
 ];
+
+function safeSymlink(target: string, linkPath: string): void {
+  const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
+  fs.symlinkSync(target, linkPath, symlinkType);
+}
 
 export class SkillsCliService {
   private homedir: string;
@@ -111,7 +124,11 @@ export class SkillsCliService {
 
   public detectAgents(): AgentDefinition[] {
     return KNOWN_AGENTS_CONFIG.map(cfg => {
-      const fullPath = path.join(this.homedir, cfg.relDir);
+      let fullPath = path.join(this.homedir, cfg.relDir);
+      if (cfg.id === 'copilot' && !fs.existsSync(fullPath)) {
+        const ghSkills = path.join(this.homedir, '.github', 'skills');
+        if (fs.existsSync(ghSkills)) fullPath = ghSkills;
+      }
       const parentDir = path.dirname(fullPath);
       const isDetected = fs.existsSync(fullPath) || fs.existsSync(parentDir);
       return {
@@ -129,7 +146,8 @@ export class SkillsCliService {
 
   public async runCli(args: string[]): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      const proc = childProcess.spawn('npx', ['skills', ...args], {
+      const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+      const proc = childProcess.spawn(npxCmd, ['skills', ...args], {
         env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' }
       });
       let stdout = '';
@@ -140,9 +158,13 @@ export class SkillsCliService {
         proc.kill('SIGKILL');
         reject(new Error(`Command timed out: npx skills ${args.join(' ')}`));
       }, 30000);
-      proc.on('close', () => {
+      proc.on('close', code => {
         clearTimeout(timer);
-        resolve({ stdout, stderr });
+        if (code !== 0) {
+          reject(new Error(stderr.trim() || stdout.trim() || `Command failed with code ${code}: npx skills ${args.join(' ')}`));
+        } else {
+          resolve({ stdout, stderr });
+        }
       });
       proc.on('error', err => {
         clearTimeout(timer);
@@ -316,7 +338,24 @@ export class SkillsCliService {
               });
             }
           } else if (lstat.isDirectory()) {
-            if (item === '.system' || item === 'codex-primary-runtime') {
+            if (item === '.system') {
+              try {
+                for (const sysItem of fs.readdirSync(p)) {
+                  if (sysItem.startsWith('.')) continue;
+                  const sysP = path.join(p, sysItem);
+                  if (fs.existsSync(path.join(sysP, 'SKILL.md'))) {
+                    builtinSkills.push({
+                      name: sysItem,
+                      agentId: agent.id,
+                      path: sysP,
+                      category: 'runtime',
+                      badgeText: 'Codex System',
+                      description: getLocalizedDescription(sysItem, this.extractSkillDescription(sysP).description || 'Codex 核心系统技能（只读保护）')
+                    });
+                  }
+                }
+              } catch {}
+            } else if (item === 'codex-primary-runtime') {
               builtinSkills.push({
                 name: item,
                 agentId: agent.id,
@@ -325,6 +364,24 @@ export class SkillsCliService {
                 badgeText: 'Core Runtime',
                 description: 'Codex 核心运行时系统底层组件（强制写保护）'
               });
+            } else if (agent.id === 'hermes' && !fs.existsSync(path.join(p, 'SKILL.md'))) {
+              // Hermes category folders containing sub-skills
+              try {
+                for (const subItem of fs.readdirSync(p)) {
+                  if (subItem.startsWith('.')) continue;
+                  const subP = path.join(p, subItem);
+                  if (fs.existsSync(path.join(subP, 'SKILL.md'))) {
+                    builtinSkills.push({
+                      name: subItem,
+                      agentId: agent.id,
+                      path: subP,
+                      category: 'builtin',
+                      badgeText: `Hermes (${item})`,
+                      description: getLocalizedDescription(subItem, this.extractSkillDescription(subP).description)
+                    });
+                  }
+                }
+              } catch {}
             } else {
               const isDuplicate = publicNamesSet.has(item);
               privateSkills.push({
@@ -400,6 +457,88 @@ export class SkillsCliService {
               }
             }
           }
+        }
+      }
+
+      if (agent.id === 'cursor') {
+        const cursorSkillsDir = path.join(this.homedir, '.cursor', 'skills-cursor');
+        if (fs.existsSync(cursorSkillsDir)) {
+          const builtinSet = new Set<string>();
+          const manifestPath = path.join(cursorSkillsDir, '.cursor-managed-skills-manifest.json');
+          if (fs.existsSync(manifestPath)) {
+            try {
+              const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+              (manifest.builtinSkillIds || []).forEach((id: string) => builtinSet.add(id));
+            } catch {}
+          }
+          for (const item of fs.readdirSync(cursorSkillsDir)) {
+            if (item.startsWith('.')) continue;
+            const itemPath = path.join(cursorSkillsDir, item);
+            if (fs.existsSync(path.join(itemPath, 'SKILL.md'))) {
+              const isBuiltin = builtinSet.has(item);
+              const badgeText = isBuiltin ? 'Cursor Built-in' : 'Cursor Managed';
+              const category = isBuiltin ? 'builtin' : 'plugin';
+              const desc = this.extractSkillDescription(itemPath).description;
+              builtinSkills.push({
+                name: item,
+                agentId: agent.id,
+                path: itemPath,
+                category,
+                badgeText,
+                description: getLocalizedDescription(item, desc)
+              });
+            }
+          }
+        }
+      }
+
+      if (agent.id === 'codex') {
+        const codexCacheDir = path.join(this.homedir, '.codex', 'plugins', 'cache');
+        if (fs.existsSync(codexCacheDir)) {
+          const seenCodex = new Set<string>(builtinSkills.map(b => b.path));
+          const scanCodexCache = (dir: string, depth = 0) => {
+            if (depth > 6) return;
+            try {
+              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                  if (fs.existsSync(path.join(full, 'SKILL.md'))) {
+                    if (seenCodex.has(full)) continue;
+                    seenCodex.add(full);
+
+                    const rel = path.relative(codexCacheDir, full);
+                    const parts = rel.split(path.sep);
+                    const group = parts[0] || 'plugin';
+                    const pkg = parts[1] || entry.name;
+                    let badgeText = `Codex Plugin (${pkg})`;
+                    let category: 'builtin' | 'plugin' | 'runtime' = 'plugin';
+                    if (group === 'openai-primary-runtime') {
+                      badgeText = `Codex Runtime (${pkg})`;
+                      category = 'runtime';
+                    } else if (group === 'openai-bundled') {
+                      badgeText = `Codex Bundled (${pkg})`;
+                      category = 'builtin';
+                    } else if (group === 'openai-curated') {
+                      badgeText = `Codex Curated (${pkg})`;
+                      category = 'plugin';
+                    }
+                    const desc = this.extractSkillDescription(full).description;
+                    builtinSkills.push({
+                      name: entry.name,
+                      agentId: agent.id,
+                      path: full,
+                      category,
+                      badgeText,
+                      description: getLocalizedDescription(entry.name, desc)
+                    });
+                  } else {
+                    scanCodexCache(full, depth + 1);
+                  }
+                }
+              }
+            } catch {}
+          };
+          scanCodexCache(codexCacheDir);
         }
       }
 
@@ -528,7 +667,7 @@ export class SkillsCliService {
           throw new Error(`${skillName} is a physical directory in ${targetAgent.name}. Please promote or convert it first.`);
         }
       }
-      fs.symlinkSync(centralSkillPath, agentSkillPath);
+      safeSymlink(centralSkillPath, agentSkillPath);
       return { success: true, message: `Linked ${skillName} -> ${targetAgent.name}` };
     } else {
       if (existingStat) {
@@ -565,7 +704,7 @@ export class SkillsCliService {
     if (fs.existsSync(destPath)) throw new Error(`Skill "${skillName}" already exists in central pool.`);
 
     fs.renameSync(sourcePath, destPath);
-    fs.symlinkSync(destPath, sourcePath);
+    safeSymlink(destPath, sourcePath);
 
     return { success: true, message: `Successfully promoted "${skillName}" to Central Pool and converted to symlink!` };
   }
@@ -585,7 +724,7 @@ export class SkillsCliService {
     if (fs.existsSync(sourcePath)) {
       fs.rmSync(sourcePath, { recursive: true, force: true });
     }
-    fs.symlinkSync(centralPath, sourcePath);
+    safeSymlink(centralPath, sourcePath);
 
     return { success: true, message: `Replaced physical duplicate "${skillName}" with standard central symlink.` };
   }
@@ -637,6 +776,9 @@ export class SkillsCliService {
     if (!targetAgent) throw new Error(`Agent not found`);
 
     let cleaned = 0;
+    if (!fs.existsSync(targetAgent.fullSkillsDir)) {
+      return { success: true, message: `No skills directory found for ${targetAgent.name}` };
+    }
     const items = fs.readdirSync(targetAgent.fullSkillsDir);
     for (const item of items) {
       const p = path.join(targetAgent.fullSkillsDir, item);
@@ -670,15 +812,40 @@ export class SkillsCliService {
   }
 
   public async installSkill(packageName: string, agents: string[]): Promise<{ success: boolean; message: string }> {
-    const args = ['add', packageName, '-g', '-y', '--json'];
-    await this.runCli(args);
-    for (const a of agents) {
-      const skillName = packageName.split('/').pop()?.replace('.git', '') || packageName;
+    // Snapshot existing central skills to accurately detect newly installed folders
+    const beforeSkills = new Set<string>();
+    if (fs.existsSync(this.centralDir)) {
       try {
-        await this.toggleAgentSkill(skillName, a, true);
+        fs.readdirSync(this.centralDir).forEach(item => beforeSkills.add(item));
       } catch {}
     }
-    return { success: true, message: `Installed ${packageName} into central pool.` };
+
+    const args = ['add', packageName, '-g', '-y', '--json'];
+    await this.runCli(args);
+
+    // Find newly added skills in central pool
+    const newlyAdded: string[] = [];
+    if (fs.existsSync(this.centralDir)) {
+      try {
+        fs.readdirSync(this.centralDir).forEach(item => {
+          if (!beforeSkills.has(item) && !item.startsWith('.')) {
+            newlyAdded.push(item);
+          }
+        });
+      } catch {}
+    }
+
+    const fallbackSkillName = packageName.split('/').pop()?.replace('.git', '') || packageName;
+    const targetSkills = newlyAdded.length > 0 ? newlyAdded : [fallbackSkillName];
+
+    for (const targetSkill of targetSkills) {
+      for (const a of agents) {
+        try {
+          await this.toggleAgentSkill(targetSkill, a, true);
+        } catch {}
+      }
+    }
+    return { success: true, message: `Installed ${packageName} into central pool (${targetSkills.join(', ')}).` };
   }
 
   public fixYamlSyntax(skillPath: string): { success: boolean; message: string } {
@@ -706,7 +873,8 @@ function targetName(id: string): string {
     workbuddy: 'WorkBuddy',
     trae: 'Trae',
     warp: 'Warp',
-    hermes: 'Hermes'
+    hermes: 'Hermes',
+    copilot: 'GitHub Copilot'
   };
   return map[id] || id;
 }

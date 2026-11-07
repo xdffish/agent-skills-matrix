@@ -148,6 +148,13 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 
 ## 📜 7. 变更日志 (Changelog)
 
+### v0.3.0 (2026-11-07)
+- **Feat**: 新增对 **GitHub Copilot** (`~/.copilot/skills` / `~/.github/skills`) 的官方第一类 Agent 纳管支持。
+- **Feat**: 深度适配 **Cursor** 内置/托管技能体系（扫描 `~/.cursor/skills-cursor`，自动解析 `.cursor-managed-skills-manifest.json`，识别 20 个 Cursor Built-in & Managed 技能）。
+- **Feat**: 深度细化 **Codex** 系统与生态插件（展开 `.system` 5 个核心系统技能，深度扫描 `~/.codex/plugins/cache` 识别 52 个 OpenAI 官方生产力、设计套件与商业战略模板技能）。
+- **Feat**: 深度适配 **WorkBuddy** 内部生态（解析 `~/.workbuddy/.skill-list-cache.json` 与插件缓存，识别 61 个企微连接器、腾讯文档、微信支付与系统内置技能）。
+- **Feat**: 深度重构 **Hermes Agent** 技能发现引擎（精准区分顶层直接实体技能与分类内置库，递归展开 MLOps、DevOps、研发自测等 56 个分类内置技能）。
+
 ### v0.2.0 (2026-11-07)
 - **Feat**: 新增 `🛒 技能集市 (Marketplace)` 独立选项卡，内置 12 款热门官方/社区精选技能包。
 - **Feat**: 集市支持 7 种分类胶囊筛选（热门精选、编程开发、视觉设计、效率办公、云原生运维、AI智能体）。
