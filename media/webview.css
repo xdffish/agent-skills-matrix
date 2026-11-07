@@ -1,4 +1,4 @@
-/* Modern Dual-Perspective CSS for Agent Skills Matrix */
+/* Modern Dual-Perspective CSS for Agent Skills Matrix with Sticky Header & Collapsible Sections */
 
 :root {
   --bg: var(--vscode-editor-background);
@@ -25,24 +25,32 @@
   padding: 0;
 }
 
+html, body {
+  height: 100%;
+  overflow: hidden; /* Main window doesn't scroll; inner container scrolls */
+}
+
 body {
   background-color: var(--bg);
   color: var(--fg);
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-size: var(--vscode-font-size, 13px);
   line-height: 1.45;
-  padding: 12px;
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Header */
+/* Pinned Sticky Header: Stays fixed during scrolling */
 .dashboard-header {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
+  padding: 12px 14px 10px 14px;
+  background-color: var(--bg);
   border-bottom: 1px solid var(--border);
+  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .top-bar {
@@ -110,7 +118,7 @@ body {
   align-items: center;
   gap: 6px;
   overflow-x: auto;
-  padding: 4px 0 2px 0;
+  padding: 2px 0;
   scrollbar-width: thin;
 }
 
@@ -199,6 +207,15 @@ body {
   cursor: pointer;
   font-size: 12px;
   display: none;
+}
+
+/* Scrollable Main Content Container */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 14px;
+  scrollbar-width: thin;
 }
 
 /* Public Matrix View */
@@ -337,11 +354,13 @@ body {
 .agent-meta-info { display: flex; flex-direction: column; gap: 2px; }
 .agent-meta-path { font-size: 11px; color: var(--muted); font-family: monospace; }
 
+/* Collapsible Section Cards */
 .section-card {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--card-bg);
   overflow: hidden;
+  transition: all 0.2s ease;
 }
 
 .section-header {
@@ -351,12 +370,26 @@ body {
   padding: 8px 12px;
   background: rgba(128, 128, 128, 0.04);
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.section-header:hover {
+  background: rgba(128, 128, 128, 0.09);
 }
 
 .section-title-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.section-collapse-indicator {
+  font-size: 12px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  display: inline-block;
+  width: 14px;
 }
 
 .section-title {
@@ -369,6 +402,18 @@ body {
 .section-body {
   display: flex;
   flex-direction: column;
+}
+
+.section-card.collapsed .section-body {
+  display: none;
+}
+
+.section-card.collapsed .section-header {
+  border-bottom: none;
+}
+
+.section-card.collapsed .section-collapse-indicator {
+  transform: rotate(-90deg);
 }
 
 .agent-skill-row {
@@ -474,7 +519,7 @@ body {
   background: linear-gradient(90deg, #3B82F6, #10B981, #8B5CF6);
   background-size: 200% 100%;
   animation: loadingGradient 1.5s infinite linear;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .loading-bar.active { display: block; }
 @keyframes loadingGradient { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }

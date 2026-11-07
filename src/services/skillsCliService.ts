@@ -362,6 +362,30 @@ export class SkillsCliService {
         }
       }
 
+      if (agent.id === 'claude-code') {
+        const claudePluginsDir = path.join(this.homedir, '.claude', 'plugins', 'marketplaces', 'claude-plugins-official', 'plugins');
+        if (fs.existsSync(claudePluginsDir)) {
+          for (const pkg of fs.readdirSync(claudePluginsDir)) {
+            const pkgSkillsDir = path.join(claudePluginsDir, pkg, 'skills');
+            if (fs.existsSync(pkgSkillsDir)) {
+              for (const sk of fs.readdirSync(pkgSkillsDir)) {
+                const skp = path.join(pkgSkillsDir, sk);
+                if (fs.existsSync(path.join(skp, 'SKILL.md'))) {
+                  builtinSkills.push({
+                    name: sk,
+                    agentId: agent.id,
+                    path: skp,
+                    category: 'plugin',
+                    badgeText: `Claude Plugin (${pkg})`,
+                    description: this.extractSkillDescription(skp).description
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
       agentDetails[agent.id] = {
         agent,
         linkedCount,

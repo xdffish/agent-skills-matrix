@@ -319,12 +319,13 @@ function renderDedicatedAgentView(agentId: string) {
   if (privateSkills.length > 0) {
     html += `
       <div class="section-card">
-        <div class="section-header">
+        <div class="section-header" data-action="toggle-section" title="点击折叠/展开本分区">
           <div class="section-title-wrap">
+            <span class="section-collapse-indicator">▾</span>
             <span style="color:#F59E0B">🟠</span>
             <span class="section-title">分区一：私有实体技能治理 (${privateSkills.length})</span>
           </div>
-          <span style="font-size:11px;color:var(--muted)">直接存储在本地物理目录，建议收编或转软链</span>
+          <span style="font-size:11px;color:var(--muted)">直接存储在本地物理目录，建议收编或转软链 (点击折叠)</span>
         </div>
         <div class="section-body">
     `;
@@ -372,12 +373,13 @@ function renderDedicatedAgentView(agentId: string) {
 
   html += `
     <div class="section-card">
-      <div class="section-header">
+      <div class="section-header" data-action="toggle-section" title="点击折叠/展开本分区">
         <div class="section-title-wrap">
+          <span class="section-collapse-indicator">▾</span>
           <span style="color:#10B981">🟢</span>
           <span class="section-title">分区二：公共技能池装配与开关 (已挂载 ${linkedCount} / 共 ${publicSkills.length})</span>
         </div>
-        <span style="font-size:11px;color:var(--muted)">源自 ~/.agents/skills，随时安全启用/停用</span>
+        <span style="font-size:11px;color:var(--muted)">源自 ~/.agents/skills (点击折叠)</span>
       </div>
       <div class="section-body">
   `;
@@ -410,13 +412,14 @@ function renderDedicatedAgentView(agentId: string) {
   // -----------------------------------------------------------
   if (builtinSkills.length > 0) {
     html += `
-      <div class="section-card">
-        <div class="section-header">
+      <div class="section-card collapsed">
+        <div class="section-header" data-action="toggle-section" title="点击折叠/展开本分区">
           <div class="section-title-wrap">
+            <span class="section-collapse-indicator">▾</span>
             <span>🔒</span>
             <span class="section-title">分区三：宿主系统内置与插件托管技能 (${builtinSkills.length})</span>
           </div>
-          <span style="font-size:11px;color:var(--muted)">系统核心，只读安全防呆</span>
+          <span style="font-size:11px;color:var(--muted)">系统核心/插件扩展，只读防呆 (点击展开)</span>
         </div>
         <div class="section-body">
     `;
@@ -447,6 +450,15 @@ function renderDedicatedAgentView(agentId: string) {
 }
 
 function bindAgentEvents(agentId: string) {
+  mainContent.querySelectorAll<HTMLElement>('[data-action="toggle-section"]').forEach(header => {
+    header.addEventListener('click', () => {
+      const card = header.closest('.section-card');
+      if (card) {
+        card.classList.toggle('collapsed');
+      }
+    });
+  });
+
   mainContent.querySelectorAll<HTMLElement>('.skill-title, [data-action="view-source"]').forEach(el => {
     el.addEventListener('click', () => {
       const p = el.getAttribute('data-path');
