@@ -14,6 +14,17 @@ import {
 
 const PROTECTED_NAMES = new Set(['.system', 'codex-primary-runtime', 'skills_backup']);
 
+/**
+ * Safely get lstat without throwing ENOENT if path doesn't exist
+ */
+function safeLstat(targetPath: string): fs.Stats | null {
+  try {
+    return fs.lstatSync(targetPath);
+  } catch {
+    return null;
+  }
+}
+
 const KNOWN_AGENTS_CONFIG: Array<{
   id: string;
   name: string;
@@ -155,11 +166,10 @@ export class SkillsCliService {
           }
           if (trimmed.startsWith('description:')) {
             const desc = trimmed.substring('description:'.length).trim();
-            if (['>', '>-', '|', '| -'].includes(desc)) {
+            if (['>', '>-', '|', '|-'].includes(desc)) {
               captureMultiline = true;
               continue;
             }
-            // Check for unquoted colon error (like nested YAML issue)
             if (desc.includes(': ') && !desc.startsWith('"') && !desc.startsWith("'")) {
               hasYamlError = true;
               yamlErrorMsg = 'Contains unquoted colon, which breaks standard YAML parsers';
@@ -195,68 +205,58 @@ export class SkillsCliService {
     for (const name of centralItems) {
       if (PROTECTED_NAMES.has(name) || name.startsWith('.')) continue;
       const fullPath = path.join(this.centralDir, name);
+      const stat = safeLstat(fullPath);
+      if (!stat || (!stat.isDirectory() && !stat.isSymbolicLink())) continue;
+
+      const isSymlinkInCentral = stat.isSymbolicLink();
+      let centralTarget: string | undefined;
       try {
-        const stat = fs.lstatSync(fullPath);
-        if (!stat.isDirectory() && !stat.isSymbolicLink()) continue;
+        if (isSymlinkInCentral) centralTarget = fs.readlinkSync(fullPath);
+      } catch {}
 
-        const isSymlinkInCentral = stat.isSymbolicLink();
-        const centralTarget = isSymlinkInCentral ? fs.readlinkSync(fullPath) : undefined;
-        const { description, hasYamlError, yamlErrorMsg } = this.extractSkillDescription(fullPath);
+      const { description, hasYamlError, yamlErrorMsg } = this.extractSkillDescription(fullPath);
+      const agentStates: Record<string, MountStatus> = {};
+      let mountedCount = 0;
 
-        const agentStates: Record<string, MountStatus> = {};
-        let mountedCount = 0;
-
-        for (const agent of agents) {
-          if (!agent.isDetected) {
-            agentStates[agent.id] = 'off';
-            continue;
-          }
-          const agentSkillPath = path.join(agent.fullSkillsDir, name);
-          try {
-            if (fs.existsSync(agentSkillPath) || fs.lstatSync(agentSkillPath).isSymbolicLink()) {
-              const aStat = fs.lstatSync(agentSkillPath);
-              if (aStat.isSymbolicLink()) {
-                const target = fs.readlinkSync(agentSkillPath);
-                // check broken symlink
-                if (!fs.existsSync(agentSkillPath)) {
-                  agentStates[agent.id] = 'broken';
-                } else if (target.includes('.agents/skills') || path.resolve(agent.fullSkillsDir, target) === path.resolve(fullPath)) {
-                  agentStates[agent.id] = 'linked';
-                  mountedCount++;
-                } else {
-                  agentStates[agent.id] = 'linked';
-                  mountedCount++;
-                }
-              } else if (aStat.isDirectory()) {
-                agentStates[agent.id] = 'physical';
-                mountedCount++;
-              }
-            } else {
-              agentStates[agent.id] = 'off';
-            }
-          } catch {
-            agentStates[agent.id] = 'off';
-          }
+      for (const agent of agents) {
+        if (!agent.isDetected) {
+          agentStates[agent.id] = 'off';
+          continue;
         }
+        const agentSkillPath = path.join(agent.fullSkillsDir, name);
+        const aStat = safeLstat(agentSkillPath);
 
-        publicSkills.push({
-          name,
-          path: fullPath,
-          description,
-          isSymlinkInCentral,
-          centralTarget,
-          hasYamlError,
-          yamlErrorMsg,
-          agentStates,
-          mountedCount
-        });
-        publicNamesSet.add(name);
-      } catch {
-        // skip unreadable
+        if (aStat) {
+          if (aStat.isSymbolicLink()) {
+            if (!fs.existsSync(agentSkillPath)) {
+              agentStates[agent.id] = 'broken';
+            } else {
+              agentStates[agent.id] = 'linked';
+              mountedCount++;
+            }
+          } else if (aStat.isDirectory()) {
+            agentStates[agent.id] = 'physical';
+            mountedCount++;
+          }
+        } else {
+          agentStates[agent.id] = 'off';
+        }
       }
+
+      publicSkills.push({
+        name,
+        path: fullPath,
+        description,
+        isSymlinkInCentral,
+        centralTarget,
+        hasYamlError,
+        yamlErrorMsg,
+        agentStates,
+        mountedCount
+      });
+      publicNamesSet.add(name);
     }
 
-    // Build Detailed inventory per agent
     const agentDetails: Record<string, AgentDetailData> = {};
 
     for (const agent of agents) {
@@ -270,62 +270,59 @@ export class SkillsCliService {
         for (const item of localItems) {
           if (item.startsWith('.') && item !== '.system') continue;
           const p = path.join(agent.fullSkillsDir, item);
-          try {
-            const lstat = fs.lstatSync(p);
-            if (lstat.isSymbolicLink()) {
-              const target = fs.readlinkSync(p);
-              const exists = fs.existsSync(p);
-              if (!exists) {
-                brokenCount++;
-                privateSkills.push({
-                  name: item,
-                  agentId: agent.id,
-                  path: p,
-                  kind: 'broken_symlink',
-                  symlinkTarget: target
-                });
-              } else if (target.includes('.agents/skills') || publicNamesSet.has(item)) {
-                linkedCount++;
-              } else {
-                privateSkills.push({
-                  name: item,
-                  agentId: agent.id,
-                  path: p,
-                  kind: 'external_symlink',
-                  symlinkTarget: target,
-                  description: this.extractSkillDescription(p).description
-                });
-              }
-            } else if (lstat.isDirectory()) {
-              if (item === '.system' || item === 'codex-primary-runtime') {
-                builtinSkills.push({
-                  name: item,
-                  agentId: agent.id,
-                  path: p,
-                  category: 'runtime',
-                  badgeText: 'Core Runtime',
-                  description: 'Codex internal runtime core dependencies (Strictly Protected)'
-                });
-              } else {
-                const isDuplicate = publicNamesSet.has(item);
-                privateSkills.push({
-                  name: item,
-                  agentId: agent.id,
-                  path: p,
-                  kind: isDuplicate ? 'duplicate_physical' : 'unique_physical',
-                  description: this.extractSkillDescription(p).description
-                });
-              }
+          const lstat = safeLstat(p);
+          if (!lstat) continue;
+
+          if (lstat.isSymbolicLink()) {
+            let target = '';
+            try { target = fs.readlinkSync(p); } catch {}
+            const exists = fs.existsSync(p);
+            if (!exists) {
+              brokenCount++;
+              privateSkills.push({
+                name: item,
+                agentId: agent.id,
+                path: p,
+                kind: 'broken_symlink',
+                symlinkTarget: target
+              });
+            } else if (target.includes('.agents/skills') || publicNamesSet.has(item)) {
+              linkedCount++;
+            } else {
+              privateSkills.push({
+                name: item,
+                agentId: agent.id,
+                path: p,
+                kind: 'external_symlink',
+                symlinkTarget: target,
+                description: this.extractSkillDescription(p).description
+              });
             }
-          } catch {
-            // skip
+          } else if (lstat.isDirectory()) {
+            if (item === '.system' || item === 'codex-primary-runtime') {
+              builtinSkills.push({
+                name: item,
+                agentId: agent.id,
+                path: p,
+                category: 'runtime',
+                badgeText: 'Core Runtime',
+                description: 'Codex internal runtime core dependencies (Strictly Protected)'
+              });
+            } else {
+              const isDuplicate = publicNamesSet.has(item);
+              privateSkills.push({
+                name: item,
+                agentId: agent.id,
+                path: p,
+                kind: isDuplicate ? 'duplicate_physical' : 'unique_physical',
+                description: this.extractSkillDescription(p).description
+              });
+            }
           }
         }
       }
 
-      // Collect Built-in & Plugin skills
       if (agent.id === 'antigravity') {
-        // Builtin
         const builtinDir = path.join(this.homedir, '.gemini', 'antigravity', 'builtin', 'skills');
         if (fs.existsSync(builtinDir)) {
           for (const b of fs.readdirSync(builtinDir)) {
@@ -342,7 +339,6 @@ export class SkillsCliService {
             }
           }
         }
-        // Plugins
         const pluginDir = path.join(this.homedir, '.gemini', 'config', 'plugins');
         if (fs.existsSync(pluginDir)) {
           for (const pkg of fs.readdirSync(pluginDir)) {
@@ -403,20 +399,25 @@ export class SkillsCliService {
     const agentSkillPath = path.join(targetAgent.fullSkillsDir, skillName);
     const centralSkillPath = path.join(this.centralDir, skillName);
 
+    const existingStat = safeLstat(agentSkillPath);
+
     if (enable) {
       if (!fs.existsSync(centralSkillPath)) {
         throw new Error(`Skill ${skillName} does not exist in central pool`);
       }
-      if (fs.existsSync(agentSkillPath) || fs.lstatSync(agentSkillPath).isSymbolicLink()) {
-        try { fs.unlinkSync(agentSkillPath); } catch {}
+      if (existingStat) {
+        if (existingStat.isSymbolicLink()) {
+          try { fs.unlinkSync(agentSkillPath); } catch {}
+        } else {
+          throw new Error(`${skillName} is a physical directory in ${targetAgent.name}. Please promote or convert it first.`);
+        }
       }
       fs.symlinkSync(centralSkillPath, agentSkillPath);
       return { success: true, message: `Linked ${skillName} -> ${targetAgent.name}` };
     } else {
-      if (fs.existsSync(agentSkillPath) || fs.lstatSync(agentSkillPath).isSymbolicLink()) {
-        const stat = fs.lstatSync(agentSkillPath);
-        if (stat.isSymbolicLink()) {
-          fs.unlinkSync(agentSkillPath);
+      if (existingStat) {
+        if (existingStat.isSymbolicLink()) {
+          try { fs.unlinkSync(agentSkillPath); } catch {}
         } else {
           throw new Error(`${skillName} is a physical directory in ${targetAgent.name}. Use dedicated agent view to promote or delete.`);
         }
@@ -447,9 +448,7 @@ export class SkillsCliService {
     if (!fs.existsSync(sourcePath)) throw new Error(`Source skill not found: ${sourcePath}`);
     if (fs.existsSync(destPath)) throw new Error(`Skill "${skillName}" already exists in central pool.`);
 
-    // Move to central pool
     fs.renameSync(sourcePath, destPath);
-    // Create symlink back
     fs.symlinkSync(destPath, sourcePath);
 
     return { success: true, message: `Successfully promoted "${skillName}" to Central Pool and converted to symlink!` };
@@ -467,11 +466,9 @@ export class SkillsCliService {
       throw new Error(`Central skill ${skillName} does not exist. Cannot deduplicate.`);
     }
 
-    // Remove local physical duplicate directory
     if (fs.existsSync(sourcePath)) {
       fs.rmSync(sourcePath, { recursive: true, force: true });
     }
-    // Link to central
     fs.symlinkSync(centralPath, sourcePath);
 
     return { success: true, message: `Replaced physical duplicate "${skillName}" with standard central symlink.` };
@@ -507,10 +504,10 @@ export class SkillsCliService {
     if (!targetAgent) throw new Error(`Agent ${agentId} not found`);
 
     const p = path.join(targetAgent.fullSkillsDir, skillName);
-    if (fs.existsSync(p) || fs.lstatSync(p).isSymbolicLink()) {
-      const stat = fs.lstatSync(p);
+    const stat = safeLstat(p);
+    if (stat) {
       if (stat.isSymbolicLink()) {
-        fs.unlinkSync(p);
+        try { fs.unlinkSync(p); } catch {}
       } else {
         fs.rmSync(p, { recursive: true, force: true });
       }
@@ -527,30 +524,28 @@ export class SkillsCliService {
     const items = fs.readdirSync(targetAgent.fullSkillsDir);
     for (const item of items) {
       const p = path.join(targetAgent.fullSkillsDir, item);
-      try {
-        if (fs.lstatSync(p).isSymbolicLink() && !fs.existsSync(p)) {
+      const stat = safeLstat(p);
+      if (stat && stat.isSymbolicLink() && !fs.existsSync(p)) {
+        try {
           fs.unlinkSync(p);
           cleaned++;
-        }
-      } catch {}
+        } catch {}
+      }
     }
     return { success: true, message: `Cleaned ${cleaned} broken symlinks in ${targetAgent.name}` };
   }
 
   public async removePublicSkill(skillName: string): Promise<{ success: boolean; message: string }> {
     if (PROTECTED_NAMES.has(skillName)) throw new Error(`Cannot delete protected component`);
-    // 1. Clean symlinks across all agents
     const agents = this.detectAgents();
     for (const a of agents) {
       if (!a.isDetected) continue;
       const ap = path.join(a.fullSkillsDir, skillName);
-      try {
-        if (fs.lstatSync(ap).isSymbolicLink()) {
-          fs.unlinkSync(ap);
-        }
-      } catch {}
+      const stat = safeLstat(ap);
+      if (stat && stat.isSymbolicLink()) {
+        try { fs.unlinkSync(ap); } catch {}
+      }
     }
-    // 2. Remove from central pool
     const centralP = path.join(this.centralDir, skillName);
     if (fs.existsSync(centralP)) {
       fs.rmSync(centralP, { recursive: true, force: true });
@@ -561,9 +556,7 @@ export class SkillsCliService {
   public async installSkill(packageName: string, agents: string[]): Promise<{ success: boolean; message: string }> {
     const args = ['add', packageName, '-g', '-y', '--json'];
     await this.runCli(args);
-    // Mount to requested agents
     for (const a of agents) {
-      // Find skill name by package basename
       const skillName = packageName.split('/').pop()?.replace('.git', '') || packageName;
       try {
         await this.toggleAgentSkill(skillName, a, true);
@@ -576,7 +569,6 @@ export class SkillsCliService {
     const skillMd = path.join(skillPath, 'SKILL.md');
     if (!fs.existsSync(skillMd)) throw new Error('SKILL.md not found');
     let content = fs.readFileSync(skillMd, 'utf-8');
-    // Wrap description in quotes if it has unquoted colon or special chars
     content = content.replace(/^description:\s*(.+)$/m, (match, desc) => {
       const d = desc.trim();
       if (!d.startsWith('"') && !d.startsWith("'")) {
