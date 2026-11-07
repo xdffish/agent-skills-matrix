@@ -1,22 +1,8 @@
 /**
- * Standard data structures for Agent Skills Matrix
+ * Comprehensive Data Structures for Agent Skills Matrix (v0.2.0 Dual-Perspective Architecture)
  */
 
-export interface RawSkillRecord {
-  name: string;
-  path: string | null;
-  scope: 'global' | 'project' | string;
-  agents: string[];
-  source?: string | null;
-  sourceUrl?: string | null;
-  sourceType?: string | null;
-  status: string;
-}
-
-export interface SkillItem extends RawSkillRecord {
-  description?: string;
-  isCustom?: boolean;
-}
+export type MountStatus = 'linked' | 'physical' | 'broken' | 'off';
 
 export interface AgentDefinition {
   id: string;
@@ -29,11 +15,76 @@ export interface AgentDefinition {
   accent: string;
 }
 
+/**
+ * A skill residing in the central public pool (~/.agents/skills)
+ */
+export interface PublicSkillItem {
+  name: string;
+  path: string;
+  description?: string;
+  isSymlinkInCentral: boolean;
+  centralTarget?: string;
+  hasYamlError?: boolean;
+  yamlErrorMsg?: string;
+  /** Map of agentId -> MountStatus */
+  agentStates: Record<string, MountStatus>;
+  /** Number of detected agents where this skill is active ('linked' or 'physical') */
+  mountedCount: number;
+}
+
+export type PrivateSkillKind =
+  | 'unique_physical'
+  | 'duplicate_physical'
+  | 'broken_symlink'
+  | 'external_symlink';
+
+/**
+ * Partition 1 in Dedicated Agent View:
+ * Skills located in an agent's directory that are NOT standard symlinks to ~/.agents/skills
+ */
+export interface LocalPrivateSkillItem {
+  name: string;
+  agentId: string;
+  path: string;
+  description?: string;
+  kind: PrivateSkillKind;
+  symlinkTarget?: string;
+}
+
+/**
+ * Partition 3 in Dedicated Agent View:
+ * System built-in, plugin-managed, or core runtime skills (Read-only)
+ */
+export interface BuiltinSkillItem {
+  name: string;
+  agentId: string;
+  path: string;
+  description?: string;
+  category: 'builtin' | 'plugin' | 'runtime';
+  badgeText: string;
+}
+
+/**
+ * Full inventory for a specific Agent's Dedicated View
+ */
+export interface AgentDetailData {
+  agent: AgentDefinition;
+  linkedCount: number;
+  privateCount: number;
+  brokenCount: number;
+  builtinCount: number;
+  totalActiveCount: number;
+  privateSkills: LocalPrivateSkillItem[];
+  builtinSkills: BuiltinSkillItem[];
+}
+
 export interface MatrixData {
-  skills: SkillItem[];
+  centralDirPath: string;
+  publicSkills: PublicSkillItem[];
   agents: AgentDefinition[];
+  agentDetails: Record<string, AgentDetailData>;
   timestamp: number;
-  totalSkills: number;
+  totalPublicSkills: number;
   detectedAgentsCount: number;
 }
 
@@ -46,7 +97,46 @@ export type WebviewToExtensionMsg =
         skillName: string;
         agentId: string;
         enabled: boolean;
-        isGlobal: boolean;
+      };
+    }
+  | {
+      type: 'mountAllAgents';
+      payload: {
+        skillName: string;
+      };
+    }
+  | {
+      type: 'promotePrivateSkill';
+      payload: {
+        skillName: string;
+        agentId: string;
+      };
+    }
+  | {
+      type: 'deduplicatePrivateSkill';
+      payload: {
+        skillName: string;
+        agentId: string;
+      };
+    }
+  | {
+      type: 'normalizeAllAgentSkills';
+      payload: {
+        agentId: string;
+      };
+    }
+  | {
+      type: 'deletePrivateSkill';
+      payload: {
+        skillName: string;
+        agentId: string;
+        kind: PrivateSkillKind;
+      };
+    }
+  | {
+      type: 'cleanBrokenSymlinks';
+      payload: {
+        agentId: string;
       };
     }
   | {
@@ -54,20 +144,25 @@ export type WebviewToExtensionMsg =
       payload: {
         packageName: string;
         agents: string[];
-        isGlobal: boolean;
       };
     }
   | {
-      type: 'removeSkill';
+      type: 'removePublicSkill';
       payload: {
         skillName: string;
-        isGlobal: boolean;
       };
     }
   | {
-      type: 'openSkillPath';
+      type: 'openSkillFile';
       payload: {
         skillPath: string;
+      };
+    }
+  | {
+      type: 'fixYamlSyntax';
+      payload: {
+        skillPath: string;
+        skillName: string;
       };
     };
 

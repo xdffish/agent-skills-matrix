@@ -1,7 +1,7 @@
 import { SkillsCliService } from '../services/skillsCliService';
 
 async function runSelfTest() {
-  console.log('🚀 Running Agent Skills Matrix CLI & Service Self-Test...\n');
+  console.log('🚀 Running Dual-Perspective Agent Skills Matrix CLI & Service Self-Test...\n');
 
   const service = new SkillsCliService();
 
@@ -14,31 +14,39 @@ async function runSelfTest() {
     console.log(`  - [${agent.name.padEnd(16)}] (${agent.id.padEnd(14)}) => ${status} at ${agent.fullSkillsDir}`);
   }
 
-  // 2. Test JSON parsing and Data Retrieval from npx skills
-  console.log('\n--- 2. Testing npx skills Integration & JSON Extraction ---');
+  // 2. Test Ground-Truth Dual-Perspective Matrix
+  console.log('\n--- 2. Testing Ground-Truth Dual-Perspective Data Retrieval ---');
   try {
     const matrixData = await service.getMatrixData();
-    console.log(`✅ Successfully fetched matrix data!`);
-    console.log(`   - Total skills found: ${matrixData.totalSkills}`);
+    console.log(`✅ Successfully fetched ground-truth matrix data!`);
+    console.log(`   - Central Public Skills (~/.agents/skills): ${matrixData.totalPublicSkills}`);
     console.log(`   - Detected active agents: ${matrixData.detectedAgentsCount}`);
 
-    // Print agent counts
-    console.log('\nVerified Ground-Truth Agent Counts:');
-    for (const agent of matrixData.agents.filter(a => a.isDetected)) {
-      const count = matrixData.skills.filter(s => s.agents.includes(agent.name)).length;
-      console.log(`   - ${agent.name.padEnd(16)}: ${count} skills genuinely mounted`);
+    console.log('\nGround-Truth Inventory per Agent:');
+    for (const [id, detail] of Object.entries(matrixData.agentDetails)) {
+      if (!detail.agent.isDetected) continue;
+      console.log(`\n🤖 [${detail.agent.name}] (Total Active: ${detail.totalActiveCount})`);
+      console.log(`   - Linked from Central Pool: ${detail.linkedCount}`);
+      console.log(`   - Private Local Skills:     ${detail.privateCount} (Unique/Duplicates/Broken)`);
+      console.log(`   - Broken Symlinks:          ${detail.brokenCount}`);
+      console.log(`   - Built-in / Plugins:       ${detail.builtinCount}`);
+
+      if (detail.privateSkills.length > 0) {
+        console.log(`     Sample Private: ${detail.privateSkills.slice(0, 3).map(s => `${s.name} (${s.kind})`).join(', ')}`);
+      }
     }
-    console.log('\nSample Skills Mounted in Matrix:');
-    matrixData.skills.slice(0, 5).forEach((skill, idx) => {
+
+    console.log('\nSample Public Skills in Central Pool:');
+    matrixData.publicSkills.slice(0, 5).forEach((skill, idx) => {
+      const mounted = Object.entries(skill.agentStates).filter(([_, st]) => st === 'linked').map(([id]) => id);
       console.log(`   ${idx + 1}. [${skill.name}]`);
-      console.log(`      Path: ${skill.path || 'N/A'}`);
-      console.log(`      Mounted Agents (${skill.agents.length}): ${skill.agents.join(', ') || 'None'}`);
-      if (skill.description) {
-        console.log(`      Description: ${skill.description}`);
+      console.log(`      Ground-truth linked agents (${mounted.length}): ${mounted.join(', ') || 'None'}`);
+      if (skill.hasYamlError) {
+        console.log(`      ⚠️ YAML Syntax Warning: ${skill.yamlErrorMsg}`);
       }
     });
 
-    console.log('\n🎉 Self-test completed with ZERO errors!');
+    console.log('\n🎉 Dual-Perspective Self-test completed with ZERO errors!');
     process.exit(0);
   } catch (err) {
     console.error('❌ Self-test failed:', err);

@@ -28,7 +28,6 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    // Handle messages from Webview
     webviewView.webview.onDidReceiveMessage(async (data: WebviewToExtensionMsg) => {
       try {
         switch (data.type) {
@@ -38,77 +37,102 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
             break;
 
           case 'toggleAgentSkill': {
-            const { skillName, agentId, enabled, isGlobal } = data.payload;
+            const { skillName, agentId, enabled } = data.payload;
             this.sendMessage({
               type: 'setLoading',
               loading: true,
-              text: `${enabled ? 'Connecting' : 'Disconnecting'} ${skillName}...`
+              text: `${enabled ? 'Linking' : 'Unlinking'} ${skillName}...`
             });
+            const res = await this._cliService.toggleAgentSkill(skillName, agentId, enabled);
+            this.sendMessage({ type: 'notify', status: res.success ? 'success' : 'error', message: res.message });
+            await this.refresh();
+            break;
+          }
 
-            const res = await this._cliService.toggleAgentSkill(
-              skillName,
-              agentId,
-              enabled,
-              isGlobal
-            );
+          case 'mountAllAgents': {
+            const { skillName } = data.payload;
+            this.sendMessage({ type: 'setLoading', loading: true, text: `Mounting ${skillName} to all agents...` });
+            const res = await this._cliService.mountAllAgents(skillName);
+            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            await this.refresh();
+            break;
+          }
 
-            this.sendMessage({
-              type: 'notify',
-              status: res.success ? 'success' : 'error',
-              message: res.message
-            });
+          case 'promotePrivateSkill': {
+            const { skillName, agentId } = data.payload;
+            this.sendMessage({ type: 'setLoading', loading: true, text: `Promoting ${skillName} to Central Pool...` });
+            const res = await this._cliService.promotePrivateSkill(skillName, agentId);
+            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            await this.refresh();
+            break;
+          }
 
+          case 'deduplicatePrivateSkill': {
+            const { skillName, agentId } = data.payload;
+            this.sendMessage({ type: 'setLoading', loading: true, text: `Deduplicating ${skillName}...` });
+            const res = await this._cliService.deduplicatePrivateSkill(skillName, agentId);
+            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            await this.refresh();
+            break;
+          }
+
+          case 'normalizeAllAgentSkills': {
+            const { agentId } = data.payload;
+            this.sendMessage({ type: 'setLoading', loading: true, text: `Normalizing all skills for ${agentId}...` });
+            const res = await this._cliService.normalizeAllAgentSkills(agentId);
+            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            await this.refresh();
+            break;
+          }
+
+          case 'deletePrivateSkill': {
+            const { skillName, agentId } = data.payload;
+            this.sendMessage({ type: 'setLoading', loading: true, text: `Deleting ${skillName}...` });
+            const res = await this._cliService.deletePrivateSkill(skillName, agentId);
+            this.sendMessage({ type: 'notify', status: 'info', message: res.message });
+            await this.refresh();
+            break;
+          }
+
+          case 'cleanBrokenSymlinks': {
+            const { agentId } = data.payload;
+            const res = await this._cliService.cleanBrokenSymlinks(agentId);
+            this.sendMessage({ type: 'notify', status: 'info', message: res.message });
+            await this.refresh();
+            break;
+          }
+
+          case 'removePublicSkill': {
+            const { skillName } = data.payload;
+            this.sendMessage({ type: 'setLoading', loading: true, text: `Removing ${skillName} from Central Pool...` });
+            const res = await this._cliService.removePublicSkill(skillName);
+            this.sendMessage({ type: 'notify', status: 'info', message: res.message });
             await this.refresh();
             break;
           }
 
           case 'installSkill': {
-            const { packageName, agents, isGlobal } = data.payload;
-            this.sendMessage({
-              type: 'setLoading',
-              loading: true,
-              text: `Installing ${packageName}...`
-            });
-
-            const res = await this._cliService.installSkill(
-              packageName,
-              agents,
-              isGlobal
-            );
-
-            this.sendMessage({
-              type: 'notify',
-              status: 'success',
-              message: res.message
-            });
-
+            const { packageName, agents } = data.payload;
+            this.sendMessage({ type: 'setLoading', loading: true, text: `Installing ${packageName}...` });
+            const res = await this._cliService.installSkill(packageName, agents);
+            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
             await this.refresh();
             break;
           }
 
-          case 'removeSkill': {
-            const { skillName, isGlobal } = data.payload;
-            this.sendMessage({
-              type: 'setLoading',
-              loading: true,
-              text: `Removing ${skillName}...`
-            });
-
-            const res = await this._cliService.removeSkill(skillName, isGlobal);
-            this.sendMessage({
-              type: 'notify',
-              status: 'info',
-              message: res.message
-            });
-            await this.refresh();
-            break;
-          }
-
-          case 'openSkillPath': {
+          case 'openSkillFile': {
             if (data.payload.skillPath) {
               const uri = vscode.Uri.file(data.payload.skillPath);
-              vscode.commands.executeCommand('revealInExplorer', uri);
+              vscode.commands.executeCommand('vscode.open', uri);
             }
+            break;
+          }
+
+          case 'fixYamlSyntax': {
+            const { skillPath } = data.payload;
+            const res = this._cliService.fixYamlSyntax(skillPath);
+            this.sendMessage({ type: 'notify', status: 'success', message: res.message });
+            await this.refresh();
             break;
           }
         }
@@ -123,14 +147,9 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  /**
-   * Fetch current matrix data and push to Webview.
-   */
   public async refresh() {
-    if (!this._view) {
-      return;
-    }
-    this.sendMessage({ type: 'setLoading', loading: true, text: 'Scanning skills matrix...' });
+    if (!this._view) return;
+    this.sendMessage({ type: 'setLoading', loading: true, text: 'Scanning skills & agents...' });
     try {
       const data = await this._cliService.getMatrixData();
       this.sendMessage({ type: 'setData', data });
@@ -138,25 +157,19 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
       this.sendMessage({
         type: 'notify',
         status: 'error',
-        message: `Failed to load skills: ${err?.message || err}`
+        message: `Failed to load: ${err?.message || err}`
       });
     } finally {
       this.sendMessage({ type: 'setLoading', loading: false });
     }
   }
 
-  /**
-   * Post message to Webview.
-   */
   public sendMessage(message: ExtensionToWebviewMsg) {
     if (this._view) {
       this._view.webview.postMessage(message);
     }
   }
 
-  /**
-   * Generate cryptographic nonce for Content Security Policy.
-   */
   private _getNonce(): string {
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -166,9 +179,6 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
     return text;
   }
 
-  /**
-   * Webview HTML markup loading compiled bundle with strict CSP.
-   */
   private _getHtmlForWebview(webview: vscode.Webview): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview.js')
@@ -188,72 +198,57 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${styleUri}">
 </head>
 <body>
-  <!-- Top Animated Loading Indicator -->
   <div id="loading-bar" class="loading-bar"></div>
 
+  <!-- Header & Top Nav -->
   <div class="dashboard-header">
     <div class="top-bar">
       <div class="brand">
         <h1>Skills Matrix</h1>
-        <span id="total-badge" class="count-chip">0 Skills</span>
+        <span id="header-status-badge" class="count-chip">Loading...</span>
       </div>
       <div class="action-buttons">
-        <button id="add-skill-btn" class="btn btn-sm" title="Install New Skill">+ Add</button>
-        <button id="refresh-btn" class="btn btn-secondary btn-sm" title="Refresh Skills">⟳</button>
+        <button id="add-skill-btn" class="btn btn-sm" title="Install New Skill">+ Install</button>
+        <button id="refresh-btn" class="btn btn-secondary btn-sm" title="Refresh">⟳</button>
       </div>
     </div>
 
-    <!-- Toolbar: Search & Scope Filter -->
+    <!-- Perspective View Navigation Tabs -->
+    <div id="view-tabs" class="view-tabs-bar">
+      <!-- Injected dynamically: Public Pool + Dedicated Agents -->
+    </div>
+
+    <!-- Search Toolbar -->
     <div class="toolbar">
       <div class="search-wrapper">
         <span class="search-icon">🔍</span>
         <input type="text" id="search-input" class="search-input" placeholder="Search skills or description...">
         <button id="clear-search-btn" class="clear-search">×</button>
       </div>
-      <select id="scope-select" class="scope-select">
-        <option value="all">All Scopes</option>
-        <option value="global">Global (~/.agents)</option>
-        <option value="project">Project</option>
-      </select>
+      <div id="quick-filter-container">
+        <!-- Injected filter dropdown or badges -->
+      </div>
     </div>
-
-    <!-- Agent Filter Pills -->
-    <div id="agent-bar" class="agent-bar"></div>
   </div>
 
-  <!-- Matrix Grid Table -->
-  <div class="matrix-container">
-    <table class="matrix-table">
-      <thead>
-        <tr id="matrix-head-row">
-          <th class="col-skill">Skill</th>
-        </tr>
-      </thead>
-      <tbody id="matrix-body">
-        <tr>
-          <td colspan="3" class="empty-state">
-            <div>⚡ Connecting to standard npx skills engine...</div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <!-- Dynamic Main Content: Public Matrix View OR Dedicated Agent View -->
+  <main id="main-content" class="main-content"></main>
 
   <!-- Add Skill Modal Drawer -->
   <div id="add-modal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>Install New Skill Package</h2>
+        <h2>Install Skill to Central Pool</h2>
         <button id="modal-close-btn" class="modal-close">×</button>
       </div>
       <form id="add-skill-form">
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label" for="pkg-input">Package Name or Git URL</label>
-            <input type="text" id="pkg-input" class="form-input" placeholder="e.g. vercel-labs/agent-skills or https://github.com/..." required>
+            <label class="form-label" for="pkg-input">Package / GitHub Repo / URL</label>
+            <input type="text" id="pkg-input" class="form-input" placeholder="e.g. vercel-labs/agent-skills or owner/repo" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Mount to Agents</label>
+            <label class="form-label">Auto-mount to Agents</label>
             <div id="agent-checkboxes" class="agent-checkbox-grid"></div>
           </div>
         </div>
@@ -265,10 +260,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
 
-  <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
-
-  <!-- Client Script -->
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
