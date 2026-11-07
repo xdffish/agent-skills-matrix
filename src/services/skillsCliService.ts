@@ -67,6 +67,22 @@ const KNOWN_AGENTS_CONFIG: Array<{
     accent: 'rgba(245, 158, 11, 0.15)'
   },
   {
+    id: 'workbuddy',
+    name: 'WorkBuddy',
+    cliArg: 'workbuddy',
+    relDir: path.join('.workbuddy', 'skills'),
+    color: '#0284C7',
+    accent: 'rgba(2, 132, 199, 0.15)'
+  },
+  {
+    id: 'trae',
+    name: 'Trae',
+    cliArg: 'trae',
+    relDir: path.join('.trae', 'skills'),
+    color: '#00C48C',
+    accent: 'rgba(0, 196, 140, 0.15)'
+  },
+  {
     id: 'warp',
     name: 'Warp',
     cliArg: 'warp',
@@ -612,6 +628,8 @@ function targetName(id: string): string {
     cursor: 'Cursor',
     codex: 'Codex',
     'claude-code': 'Claude Code',
+    workbuddy: 'WorkBuddy',
+    trae: 'Trae',
     warp: 'Warp',
     hermes: 'Hermes'
   };
