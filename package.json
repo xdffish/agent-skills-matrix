@@ -1,0 +1,85 @@
+{
+  "name": "agent-skills-matrix",
+  "displayName": "Agent Skills Matrix",
+  "description": "Multi-agent skill matrix dashboard and dispatcher powered by npx skills",
+  "version": "0.1.0",
+  "publisher": "defuxu",
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "agent",
+    "skills",
+    "antigravity",
+    "codex",
+    "cursor",
+    "claude-code",
+    "matrix"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "icon": "media/icon.png",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:agent-skills-matrix.view"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agent-skills-matrix-container",
+          "title": "Skills Matrix",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "agent-skills-matrix-container": [
+        {
+          "type": "webview",
+          "id": "agent-skills-matrix.view",
+          "name": "Matrix Dashboard"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agent-skills-matrix.refresh",
+        "title": "Refresh Skills Matrix",
+        "category": "Skills Matrix",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "agent-skills-matrix.open",
+        "title": "Open Skills Matrix Dashboard",
+        "category": "Skills Matrix"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "agent-skills-matrix.refresh",
+          "when": "view == agent-skills-matrix.view",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production",
+    "type-check": "tsc --noEmit",
+    "test:cli": "node dist/test-cli.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.3"
+  }
+}
