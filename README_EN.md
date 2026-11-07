@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-[![Version](https://img.shields.io/badge/version-0.5.9-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.10-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![Agent Skills Matrix dashboard](docs/screenshots/dashboard.png)
@@ -40,11 +40,11 @@ Discovery is limited to implemented paths and cache layouts; custom locations ar
 
 ## Installation
 
-Install a packaged `agent-skills-matrix-0.5.9.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
+Install a packaged `agent-skills-matrix-0.5.10.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.9.vsix
-cursor --install-extension agent-skills-matrix-0.5.9.vsix
+code --install-extension agent-skills-matrix-0.5.10.vsix
+cursor --install-extension agent-skills-matrix-0.5.10.vsix
 ```
 
 The package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.

@@ -50,4 +50,4 @@ jobs:
         run: npm run type-check
       - name: Publish to Visual Studio Marketplace
         if: steps.version.outputs.publish == 'true'
-        run: npx --yes @vscode/vsce@4.0.2 publish --oidc --no-dependencies
+        run: npx --yes @vscode/vsce@4.1.0 publish --oidc --no-dependencies

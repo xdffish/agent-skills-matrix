@@ -148,6 +148,9 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 
 ## 📜 7. 变更日志 (Changelog)
 
+### v0.5.10 (2026-11-07)
+- **Fix**: 自动发布使用 npm 实际提供的 `vsce` 4.1.0。
+
 ### v0.5.9 (2026-11-07)
 - **CI**: 在主分支版本号变化时通过 GitHub Actions 和 Marketplace 可信发布自动发布扩展。
 
