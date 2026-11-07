@@ -403,6 +403,81 @@ export class SkillsCliService {
         }
       }
 
+      if (agent.id === 'workbuddy') {
+        let workbuddyLoaded = false;
+        const cacheFile = path.join(this.homedir, '.workbuddy', '.skill-list-cache.json');
+        if (fs.existsSync(cacheFile)) {
+          try {
+            const cacheContent = fs.readFileSync(cacheFile, 'utf8');
+            const cacheData = JSON.parse(cacheContent);
+            const results: any[] = cacheData.results || [];
+            for (const item of results) {
+              const fp: string = item.filePath || '';
+              // Skip user skills already tracked in ~/.workbuddy/skills
+              if (fp.startsWith(agent.fullSkillsDir)) {
+                continue;
+              }
+              const skillDir = path.dirname(fp);
+              if (!fs.existsSync(fp)) continue;
+
+              const source = item.source;
+              let badgeText = 'WorkBuddy Plugin';
+              let category: 'builtin' | 'plugin' = 'plugin';
+              if (source === 'builtin') {
+                badgeText = 'WorkBuddy Built-in';
+                category = 'builtin';
+              } else if (source === 'connector') {
+                badgeText = 'WorkBuddy Connector';
+                category = 'plugin';
+              }
+
+              const desc = item.description || this.extractSkillDescription(skillDir).description;
+
+              builtinSkills.push({
+                name: item.name,
+                agentId: agent.id,
+                path: skillDir,
+                category,
+                badgeText,
+                description: getLocalizedDescription(item.name, desc)
+              });
+            }
+            workbuddyLoaded = true;
+          } catch {}
+        }
+
+        // Fallback to directory scan if cache file is not found
+        if (!workbuddyLoaded) {
+          const wbPluginCache = path.join(this.homedir, '.workbuddy', 'plugins', 'cache');
+          if (fs.existsSync(wbPluginCache)) {
+            const scanDirForSkills = (dir: string, depth = 0) => {
+              if (depth > 5) return;
+              try {
+                for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                  const full = path.join(dir, entry.name);
+                  if (entry.isDirectory()) {
+                    if (fs.existsSync(path.join(full, 'SKILL.md'))) {
+                      const desc = this.extractSkillDescription(full).description;
+                      builtinSkills.push({
+                        name: entry.name,
+                        agentId: agent.id,
+                        path: full,
+                        category: 'plugin',
+                        badgeText: 'WorkBuddy Plugin',
+                        description: getLocalizedDescription(entry.name, desc)
+                      });
+                    } else {
+                      scanDirForSkills(full, depth + 1);
+                    }
+                  }
+                }
+              } catch {}
+            };
+            scanDirForSkills(wbPluginCache);
+          }
+        }
+      }
+
       agentDetails[agent.id] = {
         agent,
         linkedCount,
