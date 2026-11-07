@@ -44,8 +44,8 @@
    ```
 4. **验证与热重载安装**：
    ```bash
-   cursor --install-extension agent-skills-matrix-<version>.vsix --force
-   "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension agent-skills-matrix-<version>.vsix --force
+   cursor --install-extension agent-skills-matrix-vsc-<version>.vsix --force
+   "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension agent-skills-matrix-vsc-<version>.vsix --force
    ```
 5. **Git 提交并附带版本号标签**：
    ```bash
@@ -127,8 +127,8 @@ npm run compile
 npx @vscode/vsce package --no-dependencies
 
 # 5. 一键安装更新到 Cursor 与 VS Code
-cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
-"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension agent-skills-matrix-0.2.0.vsix --force
+cursor --install-extension agent-skills-matrix-vsc-<version>.vsix --force
+"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension agent-skills-matrix-vsc-<version>.vsix --force
 ```
 
 ---
@@ -147,6 +147,12 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 ---
 
 ## 📜 7. 变更日志 (Changelog)
+
+### v0.5.12 (2026-11-07)
+- **Fix**: VS Code Marketplace 规定被删除扩展的 `name` 永久保留（官方文档明确“even by the original publisher”），旧 `agent-skills-matrix` 已无法再次上架，扩展名改为 `agent-skills-matrix-vsc`，显示名仍为 Agent Skills Matrix。
+- **Release**: 同时发布到 VS Code Marketplace 与 Open VSX，统一扩展 ID `xdffish.agent-skills-matrix-vsc`。
+- **CI**: Open VSX 打包产物改为通用文件名 `extension.vsix`，不再硬编码扩展名。
+- **Docs**: 中英文 README 更新安装命令、市场链接与版本徽章，并说明改名原因。
 
 ### v0.5.11 (2026-11-07)
 - **Release**: 发布者统一为 `xdffish`，扩展以 `xdffish.agent-skills-matrix` 发布；VS Code Marketplace 上早期的 `denny.agent-skills-matrix` 不再更新。

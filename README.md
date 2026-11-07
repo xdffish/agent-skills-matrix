@@ -2,7 +2,7 @@
 
 **简体中文** | [English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/version-0.5.11-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.12-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![Agent Skills Matrix 管理界面截图](docs/screenshots/dashboard.png)
@@ -40,22 +40,22 @@ Agent Skills Matrix 是一个用于查看和管理多个 AI Agent 技能目录�
 
 ## 安装
 
-扩展 ID 为 `xdffish.agent-skills-matrix`，发布在 [Open VSX](https://open-vsx.org/extension/xdffish/agent-skills-matrix)。Antigravity、Cursor、VSCodium 等使用该市场的编辑器可在扩展视图搜索 **Agent Skills Matrix** 安装，也可以使用命令行：
+扩展 ID 为 `xdffish.agent-skills-matrix-vsc`，发布在 [Open VSX](https://open-vsx.org/extension/xdffish/agent-skills-matrix-vsc) 和 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=xdffish.agent-skills-matrix-vsc)。可在扩展视图搜索 **Agent Skills Matrix** 安装，也可以使用命令行：
 
 ```bash
-code --install-extension xdffish.agent-skills-matrix
-cursor --install-extension xdffish.agent-skills-matrix
-antigravity --install-extension xdffish.agent-skills-matrix
+code --install-extension xdffish.agent-skills-matrix-vsc
+cursor --install-extension xdffish.agent-skills-matrix-vsc
+antigravity --install-extension xdffish.agent-skills-matrix-vsc
 ```
 
-也可以下载 `agent-skills-matrix-0.5.11.vsix`，在命令面板选择 **Extensions: Install from VSIX...** 安装：
+也可以下载 `agent-skills-matrix-vsc-0.5.12.vsix`，在命令面板选择 **Extensions: Install from VSIX...** 安装：
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.11.vsix
-cursor --install-extension agent-skills-matrix-0.5.11.vsix
+code --install-extension agent-skills-matrix-vsc-0.5.12.vsix
+cursor --install-extension agent-skills-matrix-vsc-0.5.12.vsix
 ```
 
-早期以 `denny` 发布者上传到 VS Code Marketplace 的 0.5.10 版本不再更新，请以上面的扩展 ID 为准。VSIX 安装包也已通过 Antigravity IDE CLI 在本机安装；其他 Antigravity 发行版本的兼容性尚未验证。更新后请重新加载编辑器窗口。
+早前以 `denny` 发布者上传的 0.5.10 和以 `xdffish.agent-skills-matrix` 上传的 Open VSX 版本都不再更新。VS Code Marketplace 规定已删除扩展的名称永久保留，因此当前扩展名带 `-vsc` 后缀，显示名称仍为 **Agent Skills Matrix**。VSIX 安装包也已通过 Antigravity IDE CLI 在本机安装；其他 Antigravity 发行版本的兼容性尚未验证。更新后请重新加载编辑器窗口。
 
 ## 使用方法
 

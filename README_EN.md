@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-[![Version](https://img.shields.io/badge/version-0.5.11-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.12-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![Agent Skills Matrix dashboard](docs/screenshots/dashboard.png)
@@ -40,22 +40,22 @@ Discovery is limited to implemented paths and cache layouts; custom locations ar
 
 ## Installation
 
-The extension ID is `xdffish.agent-skills-matrix`, published on [Open VSX](https://open-vsx.org/extension/xdffish/agent-skills-matrix). Editors that use that marketplace, such as Antigravity, Cursor, and VSCodium, can install it by searching for **Agent Skills Matrix** in the Extensions view, or from the command line:
+The extension ID is `xdffish.agent-skills-matrix-vsc`, published on [Open VSX](https://open-vsx.org/extension/xdffish/agent-skills-matrix-vsc) and the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=xdffish.agent-skills-matrix-vsc). Install it by searching for **Agent Skills Matrix** in the Extensions view, or from the command line:
 
 ```bash
-code --install-extension xdffish.agent-skills-matrix
-cursor --install-extension xdffish.agent-skills-matrix
-antigravity --install-extension xdffish.agent-skills-matrix
+code --install-extension xdffish.agent-skills-matrix-vsc
+cursor --install-extension xdffish.agent-skills-matrix-vsc
+antigravity --install-extension xdffish.agent-skills-matrix-vsc
 ```
 
-Alternatively, download `agent-skills-matrix-0.5.11.vsix` and use **Extensions: Install from VSIX...** in the Command Palette:
+Alternatively, download `agent-skills-matrix-vsc-0.5.12.vsix` and use **Extensions: Install from VSIX...** in the Command Palette:
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.11.vsix
-cursor --install-extension agent-skills-matrix-0.5.11.vsix
+code --install-extension agent-skills-matrix-vsc-0.5.12.vsix
+cursor --install-extension agent-skills-matrix-vsc-0.5.12.vsix
 ```
 
-The earlier 0.5.10 release that was uploaded to the VS Code Marketplace under the `denny` publisher is no longer updated; use the extension ID above. The VSIX package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
+The earlier 0.5.10 release under the `denny` publisher and the `xdffish.agent-skills-matrix` build on Open VSX are no longer updated. The VS Code Marketplace permanently reserves the name of a removed extension, so the current package name carries a `-vsc` suffix while the display name stays **Agent Skills Matrix**. The VSIX package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
 
 ## Usage
 

@@ -64,10 +64,10 @@ jobs:
           fi
       - name: Publish to Visual Studio Marketplace
         if: steps.version.outputs.publish == 'true' && steps.publisher.outputs.ready == 'true'
-        run: npx --yes @vscode/vsce@4.1.0 publish --oidc --no-dependencies
+        run: npx --yes @vscode/vsce@4.1.0 publish --oidc --skip-duplicate --no-dependencies
       - name: Package for Open VSX
         if: steps.version.outputs.publish == 'true' && env.OVSX_PAT != ''
-        run: npx --yes @vscode/vsce@4.1.0 package --no-dependencies -o agent-skills-matrix.vsix
+        run: npx --yes @vscode/vsce@4.1.0 package --no-dependencies -o extension.vsix
       - name: Publish to Open VSX
         if: steps.version.outputs.publish == 'true' && env.OVSX_PAT != ''
-        run: npx --yes ovsx@latest publish agent-skills-matrix.vsix -p "$OVSX_PAT"
+        run: npx --yes ovsx@latest publish extension.vsix -p "$OVSX_PAT"
