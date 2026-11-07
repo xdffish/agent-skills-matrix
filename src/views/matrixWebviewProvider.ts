@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { SkillsCliService } from '../services/skillsCliService';
 import {
   ExtensionToWebviewMsg,
-  MatrixData,
   WebviewToExtensionMsg
 } from '../types/skills';
 
@@ -43,7 +42,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
             this.sendMessage({
               type: 'setLoading',
               loading: true,
-              text: `Updating ${skillName} for ${agentId}...`
+              text: `${enabled ? 'Connecting' : 'Disconnecting'} ${skillName}...`
             });
 
             const res = await this._cliService.toggleAgentSkill(
@@ -89,6 +88,12 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
 
           case 'removeSkill': {
             const { skillName, isGlobal } = data.payload;
+            this.sendMessage({
+              type: 'setLoading',
+              loading: true,
+              text: `Removing ${skillName}...`
+            });
+
             const res = await this._cliService.removeSkill(skillName, isGlobal);
             this.sendMessage({
               type: 'notify',
@@ -111,7 +116,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
         this.sendMessage({
           type: 'notify',
           status: 'error',
-          message: err?.message || 'Unknown operation error'
+          message: err?.message || 'Operation failed'
         });
         this.sendMessage({ type: 'setLoading', loading: false });
       }
@@ -119,13 +124,13 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Fetch current data and push to Webview.
+   * Fetch current matrix data and push to Webview.
    */
   public async refresh() {
     if (!this._view) {
       return;
     }
-    this.sendMessage({ type: 'setLoading', loading: true, text: 'Scanning skills...' });
+    this.sendMessage({ type: 'setLoading', loading: true, text: 'Scanning skills matrix...' });
     try {
       const data = await this._cliService.getMatrixData();
       this.sendMessage({ type: 'setData', data });
@@ -150,379 +155,121 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Webview HTML markup with native VS Code design tokens.
+   * Generate cryptographic nonce for Content Security Policy.
+   */
+  private _getNonce(): string {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+  }
+
+  /**
+   * Webview HTML markup loading compiled bundle with strict CSP.
    */
   private _getHtmlForWebview(webview: vscode.Webview): string {
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview.js')
+    );
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.css')
+    );
+    const nonce = this._getNonce();
+
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Skills Matrix</title>
-  <style>
-    :root {
-      --bg: var(--vscode-editor-background);
-      --fg: var(--vscode-foreground);
-      --muted: var(--vscode-descriptionForeground);
-      --border: var(--vscode-widget-border, #333333);
-      --card-bg: var(--vscode-sideBar-background);
-      --hover-bg: var(--vscode-list-hoverBackground);
-      --btn-primary: var(--vscode-button-background);
-      --btn-fg: var(--vscode-button-foreground);
-      --badge-bg: var(--vscode-badge-background);
-      --badge-fg: var(--vscode-badge-foreground);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background-color: var(--bg);
-      color: var(--fg);
-      font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-      font-size: var(--vscode-font-size, 13px);
-      line-height: 1.4;
-      padding: 12px;
-    }
-
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .title-area {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .title {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .badge {
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 10px;
-      background: var(--badge-bg);
-      color: var(--badge-fg);
-      font-weight: normal;
-    }
-
-    .btn {
-      background: var(--btn-primary);
-      color: var(--btn-fg);
-      border: none;
-      padding: 4px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .btn:hover {
-      opacity: 0.9;
-    }
-
-    .stats-bar {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 12px;
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .agent-pill-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 14px;
-    }
-
-    .agent-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 11px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .agent-tag .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-
-    .table-container {
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--card-bg);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 12px;
-    }
-
-    th, td {
-      padding: 8px 10px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    th {
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--muted);
-      font-weight: 500;
-      white-space: nowrap;
-    }
-
-    tr:hover td {
-      background: var(--hover-bg);
-    }
-
-    .skill-name {
-      font-weight: 500;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .skill-desc {
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 2px;
-      max-width: 200px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .toggle-badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 10px;
-      cursor: pointer;
-      user-select: none;
-      font-weight: 600;
-      text-align: center;
-      transition: all 0.15s ease;
-    }
-
-    .toggle-badge.active {
-      background: rgba(16, 185, 129, 0.2);
-      color: #10B981;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    .toggle-badge.inactive {
-      background: rgba(148, 163, 184, 0.1);
-      color: var(--muted);
-      border: 1px solid transparent;
-    }
-
-    .toggle-badge:hover {
-      transform: scale(1.05);
-    }
-
-    .loading-overlay {
-      display: none;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 10px;
-      font-size: 11px;
-      color: #3B82F6;
-    }
-
-    .notification {
-      display: none;
-      padding: 6px 10px;
-      border-radius: 4px;
-      margin-bottom: 10px;
-      font-size: 12px;
-    }
-    .notification.success { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; }
-    .notification.error { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid #EF4444; }
-    .notification.info { background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid #3B82F6; }
-  </style>
+  <link rel="stylesheet" href="${styleUri}">
 </head>
 <body>
-  <div class="header">
-    <div class="title-area">
-      <span class="title">Agent Skills Matrix</span>
-      <span id="total-badge" class="badge">0 Skills</span>
+  <!-- Top Animated Loading Indicator -->
+  <div id="loading-bar" class="loading-bar"></div>
+
+  <div class="dashboard-header">
+    <div class="top-bar">
+      <div class="brand">
+        <h1>Skills Matrix</h1>
+        <span id="total-badge" class="count-chip">0 Skills</span>
+      </div>
+      <div class="action-buttons">
+        <button id="add-skill-btn" class="btn btn-sm" title="Install New Skill">+ Add</button>
+        <button id="refresh-btn" class="btn btn-secondary btn-sm" title="Refresh Skills">⟳</button>
+      </div>
     </div>
-    <button id="refresh-btn" class="btn" title="Refresh Skills">⟳ Refresh</button>
+
+    <!-- Toolbar: Search & Scope Filter -->
+    <div class="toolbar">
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" class="search-input" placeholder="Search skills or description...">
+        <button id="clear-search-btn" class="clear-search">×</button>
+      </div>
+      <select id="scope-select" class="scope-select">
+        <option value="all">All Scopes</option>
+        <option value="global">Global (~/.agents)</option>
+        <option value="project">Project</option>
+      </select>
+    </div>
+
+    <!-- Agent Filter Pills -->
+    <div id="agent-bar" class="agent-bar"></div>
   </div>
 
-  <div id="loading" class="loading-overlay">
-    <span>⏳ Loading and syncing skills...</span>
-  </div>
-
-  <div id="notification" class="notification"></div>
-
-  <div class="stats-bar">
-    <span id="detected-agents-count">Detected: 0 agents</span>
-    <span>•</span>
-    <span>Engine: npx skills</span>
-  </div>
-
-  <div id="agent-pills" class="agent-pill-list"></div>
-
-  <div class="table-container">
-    <table>
+  <!-- Matrix Grid Table -->
+  <div class="matrix-container">
+    <table class="matrix-table">
       <thead>
-        <tr id="table-head-row">
-          <th>Skill</th>
-          <!-- Agent headers dynamically inserted -->
+        <tr id="matrix-head-row">
+          <th class="col-skill">Skill</th>
         </tr>
       </thead>
-      <tbody id="table-body">
+      <tbody id="matrix-body">
         <tr>
-          <td colspan="4" style="text-align: center; color: var(--muted); padding: 24px;">
-            Initializing Skills Matrix...
+          <td colspan="3" class="empty-state">
+            <div>⚡ Connecting to standard npx skills engine...</div>
           </td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <script>
-    const vscode = acquireVsCodeApi();
-    let currentData = null;
+  <!-- Add Skill Modal Drawer -->
+  <div id="add-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Install New Skill Package</h2>
+        <button id="modal-close-btn" class="modal-close">×</button>
+      </div>
+      <form id="add-skill-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="pkg-input">Package Name or Git URL</label>
+            <input type="text" id="pkg-input" class="form-input" placeholder="e.g. vercel-labs/agent-skills or https://github.com/..." required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mount to Agents</label>
+            <div id="agent-checkboxes" class="agent-checkbox-grid"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="modal-cancel-btn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn">Install Package</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-    const refreshBtn = document.getElementById('refresh-btn');
-    const loadingEl = document.getElementById('loading');
-    const notificationEl = document.getElementById('notification');
-    const totalBadge = document.getElementById('total-badge');
-    const detectedAgentsEl = document.getElementById('detected-agents-count');
-    const agentPillsEl = document.getElementById('agent-pills');
-    const tableHeadRow = document.getElementById('table-head-row');
-    const tableBody = document.getElementById('table-body');
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
 
-    refreshBtn.addEventListener('click', () => {
-      vscode.postMessage({ type: 'refresh' });
-    });
-
-    function showNotification(status, message) {
-      notificationEl.className = 'notification ' + status;
-      notificationEl.textContent = message;
-      notificationEl.style.display = 'block';
-      setTimeout(() => {
-        notificationEl.style.display = 'none';
-      }, 4000);
-    }
-
-    function renderMatrix(data) {
-      currentData = data;
-      totalBadge.textContent = data.totalSkills + ' Skills';
-      detectedAgentsEl.textContent = 'Detected: ' + data.detectedAgentsCount + ' agents';
-
-      // 1. Render Agent Pills
-      agentPillsEl.innerHTML = '';
-      data.agents.forEach(agent => {
-        const pill = document.createElement('div');
-        pill.className = 'agent-tag';
-        pill.innerHTML = '<span class="dot" style="background:' + agent.color + '"></span>' +
-                         '<span>' + agent.name + '</span>' +
-                         (agent.isDetected ? ' <span style="opacity:0.6;font-size:9px;">✓</span>' : '');
-        agentPillsEl.appendChild(pill);
-      });
-
-      // 2. Render Table Headers (Active detected agents)
-      const visibleAgents = data.agents.filter(a => a.isDetected);
-      tableHeadRow.innerHTML = '<th>Skill</th>';
-      visibleAgents.forEach(agent => {
-        const th = document.createElement('th');
-        th.style.color = agent.color;
-        th.textContent = agent.name;
-        tableHeadRow.appendChild(th);
-      });
-
-      // 3. Render Table Rows
-      tableBody.innerHTML = '';
-      if (!data.skills || data.skills.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="' + (visibleAgents.length + 1) + '" style="text-align: center; color: var(--muted); padding: 20px;">No skills installed yet.</td></tr>';
-        return;
-      }
-
-      data.skills.forEach(skill => {
-        const tr = document.createElement('tr');
-
-        // Skill cell
-        const tdSkill = document.createElement('td');
-        tdSkill.className = 'skill-name';
-        tdSkill.innerHTML = '<span>' + skill.name + '</span>' +
-                            (skill.description ? '<span class="skill-desc" title="' + skill.description + '">' + skill.description + '</span>' : '');
-        tr.appendChild(tdSkill);
-
-        // Agent toggle cells
-        visibleAgents.forEach(agent => {
-          const tdAgent = document.createElement('td');
-          // Check if skill is active for this agent
-          const isMounted = skill.agents.some(a => a.toLowerCase() === agent.name.toLowerCase() || a.toLowerCase() === agent.id.toLowerCase());
-
-          const badge = document.createElement('span');
-          badge.className = 'toggle-badge ' + (isMounted ? 'active' : 'inactive');
-          badge.textContent = isMounted ? 'ON' : 'OFF';
-
-          badge.addEventListener('click', () => {
-            vscode.postMessage({
-              type: 'toggleAgentSkill',
-              payload: {
-                skillName: skill.name,
-                agentId: agent.id,
-                enabled: !isMounted,
-                isGlobal: skill.scope === 'global'
-              }
-            });
-          });
-
-          tdAgent.appendChild(badge);
-          tr.appendChild(tdAgent);
-        });
-
-        tableBody.appendChild(tr);
-      });
-    }
-
-    // Listen to messages from extension
-    window.addEventListener('message', event => {
-      const message = event.data;
-      switch (message.type) {
-        case 'setData':
-          renderMatrix(message.data);
-          break;
-        case 'setLoading':
-          loadingEl.style.display = message.loading ? 'flex' : 'none';
-          if (message.text) {
-            loadingEl.querySelector('span').textContent = message.text;
-          }
-          break;
-        case 'notify':
-          showNotification(message.status, message.message);
-          break;
-      }
-    });
-
-    // Notify extension that webview is ready
-    vscode.postMessage({ type: 'ready' });
-  </script>
+  <!-- Client Script -->
+  <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
   }

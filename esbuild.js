@@ -5,6 +5,7 @@ const isProduction = process.argv.includes('--production');
 
 /** @type {import('esbuild').BuildOptions[]} */
 const configs = [
+  // 1. Extension Host Bundle (Node.js)
   {
     entryPoints: ['src/extension.ts'],
     bundle: true,
@@ -17,6 +18,19 @@ const configs = [
     minify: isProduction,
     logLevel: 'info'
   },
+  // 2. Webview Client Bundle (Browser IIFE)
+  {
+    entryPoints: ['src/webview/main.ts'],
+    bundle: true,
+    outfile: 'dist/webview.js',
+    format: 'iife',
+    platform: 'browser',
+    target: ['es2022', 'chrome100'],
+    sourcemap: !isProduction,
+    minify: isProduction,
+    logLevel: 'info'
+  },
+  // 3. CLI Integration Test Runner (Node.js)
   {
     entryPoints: ['src/test/testCliRunner.ts'],
     bundle: true,
@@ -36,7 +50,7 @@ async function main() {
       const ctx = await esbuild.context(config);
       await ctx.watch();
     }
-    console.log('👀 Watching for changes...');
+    console.log('👀 Watching for changes in Extension & Webview...');
   } else {
     for (const config of configs) {
       await esbuild.build(config);
