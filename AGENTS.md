@@ -148,6 +148,9 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 
 ## 📜 7. 变更日志 (Changelog)
 
+### v0.5.6 (2026-11-07)
+- **Docs**: 拆分完整中英文 README，提供语言切换并保持内容一致。
+
 ### v0.5.5 (2026-11-07)
 - **Docs**: README 增加用户提供的实际界面截图。
 

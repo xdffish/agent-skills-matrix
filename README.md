@@ -1,51 +1,30 @@
 # Agent Skills Matrix
 
-[![Version](https://img.shields.io/badge/version-0.5.5-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+**简体中文** | [English](README_EN.md)
+
+[![Version](https://img.shields.io/badge/version-0.5.6-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-## 中文介绍
-
-**Agent Skills Matrix** 是一个用于查看和管理 AI Agent 技能的 VS Code 兼容扩展。它通过读取本机文件系统，集中展示公共技能、各 Agent 的技能以及当前项目中的技能。
 
 ![Agent Skills Matrix 管理界面截图](docs/screenshots/dashboard.png)
 
-主要功能：
+Agent Skills Matrix 是一个用于查看和管理多个 AI Agent 技能目录的 VS Code 兼容扩展。它直接读取文件系统状态，并使用 `npx skills` 安装技能包。
 
-- **公共技能矩阵**：查看公共技能池，并为已发现的 Agent 挂载或解除软链接。
-- **Agent 专属视图**：查看私有技能、公共池挂载状态，以及扫描到的系统和插件技能。
-- **当前项目**：只读浏览工作区 `.github/skills`、`.agents/skills` 和 `.claude/skills` 中的技能。
-- **技能集市**：通过 `npx skills` 安装精选技能包，并选择目标 Agent。
-- **双视图**：侧边栏提供紧凑视图，编辑器主区域提供更宽的管理面板。
-- **搜索与中文说明**：按名称或描述搜索，鼠标悬停可查看完整说明。
+## 功能
 
-扩展目前支持扫描 Antigravity、Cursor、Codex、Claude Code、WorkBuddy、Trae、Warp、Hermes Agent 和 GitHub Copilot 的预设目录。扫描到文件表示它存在于磁盘上，并不保证对应 Agent 或当前会话已经加载该技能；插件缓存中也可能包含未启用的版本。
+- **公共技能矩阵**：查看 `~/.agents/skills` 中的条目，并为已发现的 Agent 目录挂载或解除链接。外部链接、失效链接和实体目录会分别显示。
+- **Agent 专属视图**：查看私有技能、公共池链接，以及扫描到的系统或插件技能。支持的插件目录通过本地缓存扫描，以只读方式展示。
+- **当前项目**：只读浏览每个已打开的本地工作区文件夹下 `.github/skills`、`.agents/skills` 和 `.claude/skills` 中的技能，并保留来源路径。
+- **技能集市**：浏览精选技能包，通过 `npx skills` 安装并选择目标 Agent。如果安装没有新增可识别的技能，可以选择已有公共技能进行挂载。
+- **紧凑侧栏和编辑器面板**：从活动栏使用紧凑视图，或通过侧栏标题栏和状态栏在编辑器区域打开管理面板。
+- **搜索和说明**：按名称或描述搜索，鼠标悬停可查看被截断的完整说明。
 
-### 安装
+扫描结果只表示文件存在于磁盘上，**不代表**对应 Agent 或会话已经加载或启用该技能。插件缓存中可能包含未启用的版本。
 
-在 VS Code 或兼容编辑器中打开命令面板，选择 **Extensions: Install from VSIX...**，然后选择项目打包生成的 `agent-skills-matrix-0.5.5.vsix`。安装后可从左侧活动栏打开；点击侧栏标题栏按钮或状态栏的 **Skills Matrix**，可打开编辑器区域中的大面板。
+## 支持的 Agent 目录
 
-项目技能视图目前仅支持本地工作区，Windows 特定路径和目录链接行为尚未在 Windows 实机验证。
+扩展检查当前用户主目录下的以下路径：
 
----
-
-Agent Skills Matrix is a VS Code-compatible extension for inspecting and managing skill directories across multiple AI agents. It reads filesystem state directly and uses `npx skills` for package installation.
-
-## Features
-
-- **Public skills matrix:** Inspect entries in `~/.agents/skills` and connect or disconnect them from detected agent directories. External links, broken links, and physical directories are shown separately.
-- **Agent views:** Inspect private skills, public pool links, and discovered built-in or plugin skills. Supported plugin locations are scanned from local caches and shown read-only.
-- **Current project:** Browse skills found in `.github/skills`, `.agents/skills`, and `.claude/skills` under each open local workspace folder. Project entries are read-only and retain their source path.
-- **Marketplace:** Browse curated packages, install through `npx skills`, and choose target agents. If the installation adds no identifiable new skill, you can choose existing public skills to mount.
-- **Compact sidebar and editor panel:** Use the Activity Bar for a compact view, or open the dashboard in the editor area from the sidebar title or status bar.
-- **Search and descriptions:** Search by name or description, and hover over truncated descriptions to read them.
-
-Detected files indicate what exists on disk; they do **not** prove that a particular agent or session has loaded or enabled a skill. Cached plugin entries may include inactive versions.
-
-## Supported agent directories
-
-The extension checks paths relative to the current user's home directory:
-
-| Agent | Skills directory |
+| Agent | 技能目录 |
 | --- | --- |
 | Antigravity | `~/.gemini/config/skills` |
 | Cursor | `~/.cursor/skills` |
@@ -55,31 +34,31 @@ The extension checks paths relative to the current user's home directory:
 | Trae | `~/.trae/skills` |
 | Warp | `~/.warp/skills` |
 | Hermes Agent | `~/.hermes/skills` |
-| GitHub Copilot | `~/.github/skills` if present, otherwise `~/.copilot/skills` |
+| GitHub Copilot | 优先使用 `~/.github/skills`，不存在时使用 `~/.copilot/skills` |
 
-Discovery is limited to implemented paths and cache layouts; custom locations are not currently configurable. The project view currently supports local workspace folders only. Windows-specific paths and junction behavior have not been verified on a Windows machine.
+发现范围限于已实现的路径和缓存结构，目前不支持自定义路径。项目视图目前仅支持本地工作区文件夹。Windows 特定路径和目录联接行为尚未在 Windows 实机验证。
 
-## Installation
+## 安装
 
-Install a packaged `agent-skills-matrix-0.5.5.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
+在编辑器命令面板选择 **Extensions: Install from VSIX...**，然后选择打包生成的 `agent-skills-matrix-0.5.6.vsix`，也可以使用编辑器 CLI：
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.5.vsix
-cursor --install-extension agent-skills-matrix-0.5.5.vsix
+code --install-extension agent-skills-matrix-0.5.6.vsix
+cursor --install-extension agent-skills-matrix-0.5.6.vsix
 ```
 
-The package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
+此安装包也已通过 Antigravity IDE CLI 在本机安装；其他 Antigravity 发行版本的兼容性尚未验证。更新后请重新加载编辑器窗口。
 
-## Usage
+## 使用方法
 
-1. Open **Skills Matrix** from the Activity Bar.
-2. Use the sidebar title action or status bar button to open the larger editor-area dashboard.
-3. Switch between the current project, public pool, marketplace, and agent views. Antigravity and Cursor hosts default to their respective agent view; other hosts default to the current project.
-4. Use the public matrix or an agent view to manage links. Review conflicts before changing them.
+1. 从活动栏打开 **Skills Matrix**。
+2. 点击侧栏标题栏按钮或状态栏按钮，在编辑器区域打开更大的管理面板。
+3. 在当前项目、公共池、技能集市和 Agent 视图之间切换。Antigravity 和 Cursor 默认打开各自的 Agent 视图，其他编辑器默认显示当前项目。
+4. 在公共矩阵或 Agent 视图中管理链接；操作前检查同名冲突。
 
-Promoting a private skill moves its directory to the public pool and creates a link. Converting a same-name physical copy requires matching contents and keeps a backup of the original directory. Removing a public skill deletes its public entry after confirmation; the operation may partially complete if unlinking fails. Keep independent backups of important skills.
+收编私有技能会将目录移动到公共池并创建链接。将同名实体副本转换为链接时，要求内容一致，并保留原目录备份。删除公共技能经确认后会删除其公共条目；如果解除链接失败，操作可能只完成一部分。请独立备份重要技能。
 
-## Development
+## 开发
 
 ```bash
 npm install
@@ -88,8 +67,8 @@ npm run type-check
 npm run vsce:package
 ```
 
-`npm run watch` rebuilds on changes. `npm run test:cli` runs the CLI runner against the local environment.
+`npm run watch` 会在文件变化时重新构建。`npm run test:cli` 会针对本地环境运行 CLI 检查程序。
 
-## License
+## 许可证
 
 MIT © [defuxu](https://github.com/defuxu)

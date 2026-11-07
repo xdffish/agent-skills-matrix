@@ -1,0 +1,74 @@
+# Agent Skills Matrix
+
+[简体中文](README.md) | **English**
+
+[![Version](https://img.shields.io/badge/version-0.5.6-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+![Agent Skills Matrix dashboard](docs/screenshots/dashboard.png)
+
+Agent Skills Matrix is a VS Code-compatible extension for inspecting and managing skill directories across multiple AI agents. It reads filesystem state directly and uses `npx skills` for package installation.
+
+## Features
+
+- **Public skills matrix:** Inspect entries in `~/.agents/skills` and connect or disconnect them from detected agent directories. External links, broken links, and physical directories are shown separately.
+- **Agent views:** Inspect private skills, public pool links, and discovered built-in or plugin skills. Supported plugin locations are scanned from local caches and shown read-only.
+- **Current project:** Browse skills found in `.github/skills`, `.agents/skills`, and `.claude/skills` under each open local workspace folder. Project entries are read-only and retain their source path.
+- **Marketplace:** Browse curated packages, install through `npx skills`, and choose target agents. If the installation adds no identifiable new skill, you can choose existing public skills to mount.
+- **Compact sidebar and editor panel:** Use the Activity Bar for a compact view, or open the dashboard in the editor area from the sidebar title or status bar.
+- **Search and descriptions:** Search by name or description, and hover over truncated descriptions to read them.
+
+Detected files indicate what exists on disk; they do **not** prove that a particular agent or session has loaded or enabled a skill. Cached plugin entries may include inactive versions.
+
+## Supported agent directories
+
+The extension checks paths relative to the current user's home directory:
+
+| Agent | Skills directory |
+| --- | --- |
+| Antigravity | `~/.gemini/config/skills` |
+| Cursor | `~/.cursor/skills` |
+| Codex | `~/.codex/skills` |
+| Claude Code | `~/.claude/skills` |
+| WorkBuddy | `~/.workbuddy/skills` |
+| Trae | `~/.trae/skills` |
+| Warp | `~/.warp/skills` |
+| Hermes Agent | `~/.hermes/skills` |
+| GitHub Copilot | `~/.github/skills` if present, otherwise `~/.copilot/skills` |
+
+Discovery is limited to implemented paths and cache layouts; custom locations are not currently configurable. The project view currently supports local workspace folders only. Windows-specific paths and junction behavior have not been verified on a Windows machine.
+
+## Installation
+
+Install a packaged `agent-skills-matrix-0.5.6.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
+
+```bash
+code --install-extension agent-skills-matrix-0.5.6.vsix
+cursor --install-extension agent-skills-matrix-0.5.6.vsix
+```
+
+The package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
+
+## Usage
+
+1. Open **Skills Matrix** from the Activity Bar.
+2. Use the sidebar title action or status bar button to open the larger editor-area dashboard.
+3. Switch between the current project, public pool, marketplace, and agent views. Antigravity and Cursor hosts default to their respective agent view; other hosts default to the current project.
+4. Use the public matrix or an agent view to manage links. Review conflicts before changing them.
+
+Promoting a private skill moves its directory to the public pool and creates a link. Converting a same-name physical copy requires matching contents and keeps a backup of the original directory. Removing a public skill deletes its public entry after confirmation; the operation may partially complete if unlinking fails. Keep independent backups of important skills.
+
+## Development
+
+```bash
+npm install
+npm run compile
+npm run type-check
+npm run vsce:package
+```
+
+`npm run watch` rebuilds on changes. `npm run test:cli` runs the CLI runner against the local environment.
+
+## License
+
+MIT © [defuxu](https://github.com/defuxu)
