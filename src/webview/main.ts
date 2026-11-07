@@ -17,12 +17,14 @@ const vscode = acquireVsCodeApi();
 interface WebviewState {
   currentPerspective: string; // 'public' or agent.id
   searchQuery: string;
+  partition2Filter: 'all' | 'enabled' | 'disabled';
   matrixData: MatrixData | null;
 }
 
 let state: WebviewState = {
   currentPerspective: 'public',
   searchQuery: '',
+  partition2Filter: 'all',
   matrixData: null
 };
 
@@ -363,7 +365,11 @@ function renderDedicatedAgentView(agentId: string) {
   // -----------------------------------------------------------
   // Partition 2: Public Pool Selection for this Agent
   // -----------------------------------------------------------
+  const unlinkedCount = publicSkills.length - linkedCount;
   const filteredPublic = publicSkills.filter(s => {
+    const isMounted = s.agentStates[agent.id] === 'linked';
+    if (state.partition2Filter === 'enabled' && !isMounted) return false;
+    if (state.partition2Filter === 'disabled' && isMounted) return false;
     if (!state.searchQuery) return true;
     return s.name.toLowerCase().includes(state.searchQuery) ||
            (s.description || '').toLowerCase().includes(state.searchQuery);
@@ -377,31 +383,44 @@ function renderDedicatedAgentView(agentId: string) {
           <span style="color:#10B981">🟢</span>
           <span class="section-title">分区二：公共技能池装配与开关 (已挂载 ${linkedCount} / 共 ${publicSkills.length})</span>
         </div>
-        <span style="font-size:11px;color:var(--muted)">源自 ~/.agents/skills (点击折叠)</span>
+        <div class="partition2-filter-group" data-stop-propagation="true">
+          <button class="filter-pill-btn ${state.partition2Filter === 'all' ? 'active' : ''}" data-p2-filter="all">全部 (${publicSkills.length})</button>
+          <button class="filter-pill-btn ${state.partition2Filter === 'enabled' ? 'active' : ''}" data-p2-filter="enabled">🟢 已启用 (${linkedCount})</button>
+          <button class="filter-pill-btn ${state.partition2Filter === 'disabled' ? 'active' : ''}" data-p2-filter="disabled">⚪ 未启用 (${unlinkedCount})</button>
+        </div>
       </div>
       <div class="section-body">
   `;
 
-  filteredPublic.forEach(skill => {
-    const isMounted = skill.agentStates[agent.id] === 'linked';
+  if (filteredPublic.length === 0) {
     html += `
-      <div class="agent-skill-row">
-        <div class="skill-main-info">
-          <div class="skill-title-row">
-            <span class="skill-title" data-path="${skill.path}">${isMounted ? '🔗' : '⚪'} ${skill.name}</span>
-            <span class="badge-tag ${isMounted ? 'badge-info' : ''}">${isMounted ? '已软链' : '未挂载'}</span>
-          </div>
-          ${skill.description ? `<span class="skill-desc-text">${skill.description}</span>` : ''}
-        </div>
-        <div class="skill-row-actions">
-          <span class="toggle-pill ${isMounted ? 'linked' : 'off'}" data-action="toggle" data-skill="${skill.name}" data-agent="${agent.id}" data-enable="${!isMounted}">
-            ${isMounted ? '🟢 已启用' : '⚪ 未启用'}
-          </span>
-          <button class="btn btn-danger btn-sm" data-action="delete-public" data-skill="${skill.name}" title="从公共池彻底移除该技能">🗑 全局删除</button>
-        </div>
+      <div class="empty-state">
+        <div>🔍 没有符合条件的技能</div>
+        <p>${state.partition2Filter === 'enabled' ? '当前 Agent 暂无已启用的公共技能' : state.partition2Filter === 'disabled' ? '当前公共技能已全部挂载启用' : '无匹配技能'}</p>
       </div>
     `;
-  });
+  } else {
+    filteredPublic.forEach(skill => {
+      const isMounted = skill.agentStates[agent.id] === 'linked';
+      html += `
+        <div class="agent-skill-row">
+          <div class="skill-main-info">
+            <div class="skill-title-row">
+              <span class="skill-title" data-path="${skill.path}">${isMounted ? '🔗' : '⚪'} ${skill.name}</span>
+              <span class="badge-tag ${isMounted ? 'badge-info' : ''}">${isMounted ? '已软链' : '未挂载'}</span>
+            </div>
+            ${skill.description ? `<span class="skill-desc-text">${skill.description}</span>` : ''}
+          </div>
+          <div class="skill-row-actions">
+            <span class="toggle-pill ${isMounted ? 'linked' : 'off'}" data-action="toggle" data-skill="${skill.name}" data-agent="${agent.id}" data-enable="${!isMounted}">
+              ${isMounted ? '🟢 已启用' : '⚪ 未启用'}
+            </span>
+            <button class="btn btn-danger btn-sm" data-action="delete-public" data-skill="${skill.name}" title="从公共池彻底移除该技能">🗑 全局删除</button>
+          </div>
+        </div>
+      `;
+    });
+  }
 
   html += `</div></div>`;
 
@@ -448,6 +467,18 @@ function renderDedicatedAgentView(agentId: string) {
 }
 
 function bindAgentEvents(agentId: string) {
+  mainContent.querySelectorAll<HTMLElement>('.partition2-filter-group').forEach(group => {
+    group.addEventListener('click', (e) => e.stopPropagation());
+  });
+
+  mainContent.querySelectorAll<HTMLElement>('[data-p2-filter]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.partition2Filter = btn.getAttribute('data-p2-filter') as any;
+      render();
+    });
+  });
+
   mainContent.querySelectorAll<HTMLElement>('[data-action="toggle-section"]').forEach(header => {
     header.addEventListener('click', () => {
       const card = header.closest('.section-card');

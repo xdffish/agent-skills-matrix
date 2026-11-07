@@ -11,6 +11,7 @@ import {
   MountStatus,
   PublicSkillItem
 } from '../types/skills';
+import { getLocalizedDescription } from '../types/descriptions';
 
 const PROTECTED_NAMES = new Set(['.system', 'codex-primary-runtime', 'skills_backup']);
 
@@ -246,7 +247,7 @@ export class SkillsCliService {
       publicSkills.push({
         name,
         path: fullPath,
-        description,
+        description: getLocalizedDescription(name, description),
         isSymlinkInCentral,
         centralTarget,
         hasYamlError,
@@ -295,7 +296,7 @@ export class SkillsCliService {
                 path: p,
                 kind: 'external_symlink',
                 symlinkTarget: target,
-                description: this.extractSkillDescription(p).description
+                description: getLocalizedDescription(item, this.extractSkillDescription(p).description)
               });
             }
           } else if (lstat.isDirectory()) {
@@ -306,7 +307,7 @@ export class SkillsCliService {
                 path: p,
                 category: 'runtime',
                 badgeText: 'Core Runtime',
-                description: 'Codex internal runtime core dependencies (Strictly Protected)'
+                description: 'Codex 核心运行时系统底层组件（强制写保护）'
               });
             } else {
               const isDuplicate = publicNamesSet.has(item);
@@ -315,7 +316,7 @@ export class SkillsCliService {
                 agentId: agent.id,
                 path: p,
                 kind: isDuplicate ? 'duplicate_physical' : 'unique_physical',
-                description: this.extractSkillDescription(p).description
+                description: getLocalizedDescription(item, this.extractSkillDescription(p).description)
               });
             }
           }
@@ -334,7 +335,7 @@ export class SkillsCliService {
                 path: bp,
                 category: 'builtin',
                 badgeText: 'Built-in',
-                description: this.extractSkillDescription(bp).description
+                description: getLocalizedDescription(b, this.extractSkillDescription(bp).description)
               });
             }
           }
@@ -353,7 +354,7 @@ export class SkillsCliService {
                     path: skp,
                     category: 'plugin',
                     badgeText: `Plugin (${pkg})`,
-                    description: this.extractSkillDescription(skp).description
+                    description: getLocalizedDescription(sk, this.extractSkillDescription(skp).description)
                   });
                 }
               }
@@ -377,7 +378,7 @@ export class SkillsCliService {
                     path: skp,
                     category: 'plugin',
                     badgeText: `Claude Plugin (${pkg})`,
-                    description: this.extractSkillDescription(skp).description
+                    description: getLocalizedDescription(sk, this.extractSkillDescription(skp).description)
                   });
                 }
               }
