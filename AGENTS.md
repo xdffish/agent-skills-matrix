@@ -148,6 +148,9 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 
 ## 📜 7. 变更日志 (Changelog)
 
+### v0.5.3 (2026-11-07)
+- **Docs**: 更新 README 的功能、支持目录、安装方式与限制，移除过时和未经验证的表述。
+
 ### v0.5.2 (2026-11-07)
 - **UX**: 侧栏使用紧凑布局，简化导航、分区和技能行；编辑器大面板保留完整操作。
 
