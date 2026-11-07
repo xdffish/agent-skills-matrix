@@ -2,8 +2,8 @@
   "name": "agent-skills-matrix",
   "displayName": "Agent Skills Matrix",
   "description": "Multi-agent skill matrix dashboard and dispatcher powered by standard npx skills",
-  "version": "0.5.6",
-  "publisher": "defuxu",
+  "version": "0.5.7",
+  "publisher": "denny",
   "author": {
     "name": "defuxu"
   },
