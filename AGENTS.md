@@ -148,6 +148,9 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 
 ## 📜 7. 变更日志 (Changelog)
 
+### v0.5.9 (2026-11-07)
+- **CI**: 在主分支版本号变化时通过 GitHub Actions 和 Marketplace 可信发布自动发布扩展。
+
 ### v0.5.8 (2026-11-07)
 - **Design**: 更新插件市场图标，保留四格矩阵与 Agent 连接的视觉元素。
 

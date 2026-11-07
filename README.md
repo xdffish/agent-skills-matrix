@@ -2,7 +2,7 @@
 
 **简体中文** | [English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/version-0.5.8-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.9-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![Agent Skills Matrix 管理界面截图](docs/screenshots/dashboard.png)
@@ -40,11 +40,11 @@ Agent Skills Matrix 是一个用于查看和管理多个 AI Agent 技能目录�
 
 ## 安装
 
-在编辑器命令面板选择 **Extensions: Install from VSIX...**，然后选择打包生成的 `agent-skills-matrix-0.5.8.vsix`，也可以使用编辑器 CLI：
+在编辑器命令面板选择 **Extensions: Install from VSIX...**，然后选择打包生成的 `agent-skills-matrix-0.5.9.vsix`，也可以使用编辑器 CLI：
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.8.vsix
-cursor --install-extension agent-skills-matrix-0.5.8.vsix
+code --install-extension agent-skills-matrix-0.5.9.vsix
+cursor --install-extension agent-skills-matrix-0.5.9.vsix
 ```
 
 此安装包也已通过 Antigravity IDE CLI 在本机安装；其他 Antigravity 发行版本的兼容性尚未验证。更新后请重新加载编辑器窗口。
@@ -68,6 +68,8 @@ npm run vsce:package
 ```
 
 `npm run watch` 会在文件变化时重新构建。`npm run test:cli` 会针对本地环境运行 CLI 检查程序。
+
+推送到 `main` 且 `package.json` 版本号发生变化时，GitHub Actions 会通过可信发布将扩展发布到 VS Code Marketplace；也可以从 Actions 页面手动运行发布工作流。
 
 ## 许可证
 
