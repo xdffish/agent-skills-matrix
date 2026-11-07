@@ -10,3 +10,4 @@ esbuild.js
 *.vsix
 .DS_Store
 vscode-skills-explainer.html
+docs/screenshots/sidebar.png

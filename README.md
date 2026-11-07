@@ -1,11 +1,13 @@
 # Agent Skills Matrix
 
-[![Version](https://img.shields.io/badge/version-0.5.4-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.5-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 中文介绍
 
 **Agent Skills Matrix** 是一个用于查看和管理 AI Agent 技能的 VS Code 兼容扩展。它通过读取本机文件系统，集中展示公共技能、各 Agent 的技能以及当前项目中的技能。
+
+![Agent Skills Matrix 管理界面截图](docs/screenshots/dashboard.png)
 
 主要功能：
 
@@ -20,7 +22,7 @@
 
 ### 安装
 
-在 VS Code 或兼容编辑器中打开命令面板，选择 **Extensions: Install from VSIX...**，然后选择项目打包生成的 `agent-skills-matrix-0.5.4.vsix`。安装后可从左侧活动栏打开；点击侧栏标题栏按钮或状态栏的 **Skills Matrix**，可打开编辑器区域中的大面板。
+在 VS Code 或兼容编辑器中打开命令面板，选择 **Extensions: Install from VSIX...**，然后选择项目打包生成的 `agent-skills-matrix-0.5.5.vsix`。安装后可从左侧活动栏打开；点击侧栏标题栏按钮或状态栏的 **Skills Matrix**，可打开编辑器区域中的大面板。
 
 项目技能视图目前仅支持本地工作区，Windows 特定路径和目录链接行为尚未在 Windows 实机验证。
 
@@ -59,11 +61,11 @@ Discovery is limited to implemented paths and cache layouts; custom locations ar
 
 ## Installation
 
-Install a packaged `agent-skills-matrix-0.5.4.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
+Install a packaged `agent-skills-matrix-0.5.5.vsix` using **Extensions: Install from VSIX...** in the editor's Command Palette, or use its CLI:
 
 ```bash
-code --install-extension agent-skills-matrix-0.5.4.vsix
-cursor --install-extension agent-skills-matrix-0.5.4.vsix
+code --install-extension agent-skills-matrix-0.5.5.vsix
+cursor --install-extension agent-skills-matrix-0.5.5.vsix
 ```
 
 The package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.
