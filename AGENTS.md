@@ -148,6 +148,9 @@ cursor --install-extension agent-skills-matrix-0.2.0.vsix --force
 
 ## 📜 7. 变更日志 (Changelog)
 
+### v0.5.8 (2026-11-07)
+- **Design**: 更新插件市场图标，保留四格矩阵与 Agent 连接的视觉元素。
+
 ### v0.5.7 (2026-11-07)
 - **Release**: 使用已创建的 Marketplace 发布者 `denny` 打包扩展。
 
