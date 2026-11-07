@@ -50,6 +50,57 @@ const viewTabsBar = document.getElementById('view-tabs') as HTMLElement;
 const mainContent = document.getElementById('main-content') as HTMLElement;
 const loadingBar = document.getElementById('loading-bar') as HTMLElement;
 const toastContainer = document.getElementById('toast-container') as HTMLElement;
+const helpTooltip = document.createElement('div');
+helpTooltip.className = 'help-tooltip';
+helpTooltip.setAttribute('role', 'tooltip');
+helpTooltip.setAttribute('aria-hidden', 'true');
+document.body.appendChild(helpTooltip);
+let tooltipTimer: ReturnType<typeof setTimeout> | undefined;
+
+function hideHelpTooltip() {
+  if (tooltipTimer) clearTimeout(tooltipTimer);
+  helpTooltip.classList.remove('visible');
+  helpTooltip.setAttribute('aria-hidden', 'true');
+}
+
+function showHelpTooltip(target: HTMLElement, x: number, y: number) {
+  const text = target.dataset.help;
+  if (!text) return;
+  if (tooltipTimer) clearTimeout(tooltipTimer);
+  tooltipTimer = setTimeout(() => {
+    helpTooltip.textContent = text;
+    helpTooltip.classList.add('visible');
+    helpTooltip.setAttribute('aria-hidden', 'false');
+    const margin = 12, gap = 14;
+    const rect = helpTooltip.getBoundingClientRect();
+    helpTooltip.style.left = `${Math.max(margin, Math.min(x + gap, innerWidth - rect.width - margin))}px`;
+    helpTooltip.style.top = `${Math.max(margin, Math.min(y + gap, innerHeight - rect.height - margin))}px`;
+  }, 350);
+}
+
+document.addEventListener('mouseover', event => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-help]');
+  if (target) showHelpTooltip(target, (event as MouseEvent).clientX, (event as MouseEvent).clientY);
+});
+document.addEventListener('mousemove', event => {
+  if (helpTooltip.classList.contains('visible')) {
+    const rect = helpTooltip.getBoundingClientRect();
+    const margin = 12, gap = 14;
+    helpTooltip.style.left = `${Math.max(margin, Math.min(event.clientX + gap, innerWidth - rect.width - margin))}px`;
+    helpTooltip.style.top = `${Math.max(margin, Math.min(event.clientY + gap, innerHeight - rect.height - margin))}px`;
+  }
+});
+document.addEventListener('mouseout', event => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-help]');
+  if (target && !target.contains(event.relatedTarget as Node | null)) hideHelpTooltip();
+});
+document.addEventListener('focusin', event => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-help]');
+  if (target) showHelpTooltip(target, target.getBoundingClientRect().left, target.getBoundingClientRect().bottom);
+});
+document.addEventListener('focusout', event => {
+  if ((event.target as HTMLElement).closest('[data-help]')) hideHelpTooltip();
+});
 
 // Add Modal references
 const addModal = document.getElementById('add-modal') as HTMLElement;
@@ -147,6 +198,16 @@ function renderTabs() {
   });
   viewTabsBar.appendChild(pubTab);
 
+  const workspaceTab = document.createElement('div');
+  workspaceTab.className = `tab-btn ${state.currentPerspective === 'workspace' ? 'active' : ''}`;
+  workspaceTab.textContent = `📁 当前项目 (${state.matrixData.workspaceSkills.length})`;
+  workspaceTab.addEventListener('click', () => {
+    state.currentPerspective = 'workspace';
+    renderTabs();
+    render();
+  });
+  viewTabsBar.appendChild(workspaceTab);
+
   // 2. Marketplace Tab
   const marketTab = document.createElement('div');
   marketTab.className = `tab-btn ${state.currentPerspective === 'marketplace' ? 'active' : ''}`;
@@ -162,7 +223,7 @@ function renderTabs() {
   viewTabsBar.appendChild(marketTab);
 
   // 3. Individual Agent Tabs
-  agents.filter(a => a.isDetected).forEach(agent => {
+  agents.filter(a => a.isDetected || a.id === state.matrixData!.hostAgentId).forEach(agent => {
     const detail = agentDetails[agent.id];
     const totalActive = detail ? detail.totalActiveCount : 0;
     const tab = document.createElement('div');
@@ -178,18 +239,39 @@ function renderTabs() {
       render();
     });
     viewTabsBar.appendChild(tab);
+    if (agent.id === state.matrixData!.hostAgentId) viewTabsBar.prepend(tab);
   });
+  viewTabsBar.insertBefore(workspaceTab, pubTab);
+  viewTabsBar.appendChild(marketTab);
 }
 
 function render() {
   if (!state.matrixData) return;
   if (state.currentPerspective === 'public') {
     renderPublicView();
+  } else if (state.currentPerspective === 'workspace') {
+    renderWorkspaceView();
   } else if (state.currentPerspective === 'marketplace') {
     renderMarketplaceView();
   } else {
     renderDedicatedAgentView(state.currentPerspective);
   }
+}
+
+function renderWorkspaceView() {
+  const data = state.matrixData!;
+  const skills = data.workspaceSkills.filter(s => [s.name, s.workspace, s.source, s.description].some(v => v.toLowerCase().includes(state.searchQuery))).sort(compareNames);
+  headerBadge.textContent = `当前项目技能 ${skills.length} / ${data.workspaceSkills.length}`;
+  let html = `<div class="agent-view-container"><div class="agent-meta-banner"><div>当前项目技能 · 只读浏览。文件存在不代表助手已加载。</div></div>`;
+  if (!data.workspaceFolders.length) html += `<div class="empty-state">尚未打开工作区文件夹。</div>`;
+  for (const error of data.workspaceScanErrors) html += `<div class="empty-state">${escapeHtml(error)}</div>`;
+  if (data.workspaceFolders.length && !skills.length) html += `<div class="empty-state">没有发现匹配的项目技能。</div>`;
+  for (const skill of skills) html += `<div class="agent-skill-row"><div class="skill-main-info"><span class="skill-title" data-path="${escapeHtml(skill.path)}">${escapeHtml(skill.name)}</span><span class="skill-desc-text">${escapeHtml(skill.workspace)} · ${escapeHtml(skill.source)}</span>${skill.description ? `<span class="skill-desc-text" data-help="${escapeHtml(skill.description)}">${escapeHtml(skill.description)}</span>` : ''}</div><button class="btn btn-secondary btn-sm" data-action="workspace-source" data-path="${escapeHtml(skill.path)}">📖 查看源码</button></div>`;
+  mainContent.innerHTML = html + '</div>';
+  mainContent.querySelectorAll<HTMLElement>('[data-action="workspace-source"], .skill-title').forEach(el => el.addEventListener('click', () => {
+    const p = el.getAttribute('data-path');
+    if (p) vscode.postMessage({ type: 'openSkillFile', payload: { skillPath: `${p}/SKILL.md` } });
+  }));
 }
 
 // -------------------------------------------------------------
@@ -236,7 +318,7 @@ function renderPublicView() {
               ${skill.hasYamlError ? `<span class="badge-tag badge-warning" title="${escapeHtml(skill.yamlErrorMsg || 'YAML format warning')}">⚠️ YAML语法</span>` : ''}
               ${skill.isSymlinkInCentral ? `<span class="badge-tag badge-info" title="${escapeHtml(skill.centralTarget)}">外部软链</span>` : ''}
             </div>
-            ${skill.description ? `<span class="skill-desc-text" title="${escapeHtml(skill.description)}">${escapeHtml(skill.description)}</span>` : ''}
+            ${skill.description ? `<span class="skill-desc-text" data-help="${escapeHtml(skill.description)}">${escapeHtml(skill.description)}</span>` : ''}
           </div>
         </td>
     `;
@@ -412,7 +494,7 @@ function renderMarketplaceView() {
               </div>
             </div>
           </div>
-          <div class="market-card-desc" style="margin-top:8px;" title="${item.descriptionZh}">
+          <div class="market-card-desc" data-help="${escapeHtml(item.descriptionZh)}" style="margin-top:8px;">
             ${item.descriptionZh}
           </div>
         </div>
@@ -530,7 +612,7 @@ function renderDedicatedAgentView(agentId: string) {
               ${item.kind === 'duplicate_physical' ? `<span class="badge-tag badge-info">冗余副本: 公共池已有</span>` : ''}
               ${item.kind === 'broken_symlink' ? `<span class="badge-tag badge-danger">失效死链</span>` : ''}
             </div>
-            ${item.description ? `<span class="skill-desc-text">${escapeHtml(item.description)}</span>` : ''}
+            ${item.description ? `<span class="skill-desc-text" data-help="${escapeHtml(item.description)}">${escapeHtml(item.description)}</span>` : ''}
           </div>
           <div class="skill-row-actions">
             ${item.kind === 'unique_physical' ? `
@@ -571,7 +653,7 @@ function renderDedicatedAgentView(agentId: string) {
         <div class="section-title-wrap">
           <span class="section-collapse-indicator">▾</span>
           <span style="color:#10B981">🟢</span>
-          <span class="section-title">分区二：公共技能池装配与开关 (已挂载 ${linkedCount} / 共 ${publicSkills.length})</span>
+          <span class="section-title"><span class="full-label">分区二：公共技能池装配与开关 (已挂载 ${linkedCount} / 共 ${publicSkills.length})</span><span class="compact-label">公共技能 ${linkedCount}/${publicSkills.length}</span></span>
         </div>
         <div class="partition2-filter-group" data-stop-propagation="true">
           <button class="filter-pill-btn ${state.partition2Filter === 'all' ? 'active' : ''}" data-p2-filter="all">全部 (${publicSkills.length})</button>
@@ -601,7 +683,7 @@ function renderDedicatedAgentView(agentId: string) {
               <span class="skill-title" data-path="${escapeHtml(skill.path)}">${isMounted ? '🔗' : '⚪'} ${escapeHtml(skill.name)}</span>
               <span class="badge-tag ${isMounted ? 'badge-info' : ''}">${label}</span>
             </div>
-            ${skill.description ? `<span class="skill-desc-text">${escapeHtml(skill.description)}</span>` : ''}
+            ${skill.description ? `<span class="skill-desc-text" data-help="${escapeHtml(skill.description)}">${escapeHtml(skill.description)}</span>` : ''}
           </div>
           <div class="skill-row-actions">
             ${mountStatus === 'linked' || mountStatus === 'off' ? `<span class="toggle-pill ${isMounted ? 'linked' : 'off'}" data-action="toggle" data-skill="${escapeHtml(skill.name)}" data-agent="${agent.id}" data-enable="${!isMounted}">
@@ -646,7 +728,7 @@ function renderDedicatedAgentView(agentId: string) {
               <span class="skill-title" data-path="${escapeHtml(b.path)}">🔒 ${agentId === 'codex' && b.name.includes(':') ? '$' : ''}${escapeHtml(b.name)}</span>
               <span class="badge-tag badge-warning">${escapeHtml(b.badgeText)}</span>
             </div>
-            ${b.description ? `<span class="skill-desc-text">${escapeHtml(b.description)}</span>` : ''}
+            ${b.description ? `<span class="skill-desc-text" data-help="${escapeHtml(b.description)}">${escapeHtml(b.description)}</span>` : ''}
           </div>
           <div class="skill-row-actions">
             <button class="btn btn-secondary btn-sm" data-action="view-source" data-path="${escapeHtml(b.path)}">📖 查看源码</button>
@@ -749,6 +831,7 @@ window.addEventListener('message', (event: MessageEvent<ExtensionToWebviewMsg>) 
   const msg = event.data;
   switch (msg.type) {
     case 'setData':
+      if (!state.matrixData) state.currentPerspective = msg.data.hostAgentId || 'workspace';
       state.matrixData = msg.data;
       renderTabs();
       render();

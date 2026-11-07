@@ -9,3 +9,4 @@ esbuild.js
 *.log
 *.vsix
 .DS_Store
+vscode-skills-explainer.html

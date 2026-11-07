@@ -283,6 +283,28 @@ body {
   max-width: 250px;
 }
 
+.help-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(440px, calc(100vw - 24px));
+  max-height: min(45vh, 320px);
+  overflow: auto;
+  padding: 9px 12px;
+  border: 1px solid var(--vscode-editorWidget-border, var(--border));
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--card-bg));
+  color: var(--vscode-editorWidget-foreground, var(--fg));
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.help-tooltip.visible { opacity: 1; visibility: visible; }
+
 .badge-tag {
   font-size: 9px;
   text-transform: uppercase;
@@ -482,6 +504,36 @@ body {
   align-items: center;
   gap: 6px;
 }
+
+.compact-label { display: none; }
+
+/* Keep the sidebar concise while the editor panel retains the full controls. */
+body.sidebar-mode { background: var(--vscode-sideBar-background, var(--bg)); }
+.sidebar-mode .dashboard-header { padding: 8px 10px; gap: 7px; box-shadow: none; }
+.sidebar-mode .brand h1, .sidebar-mode .count-chip, .sidebar-mode #skills-sh-btn { display: none; }
+.sidebar-mode .top-bar { justify-content: flex-end; }
+.sidebar-mode .view-tabs-bar { gap: 2px; }
+.sidebar-mode .tab-btn { padding: 4px 7px; border: 0; border-radius: 4px; background: transparent; }
+.sidebar-mode .tab-btn.active { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+.sidebar-mode .tab-btn .tab-badge { background: transparent; padding: 0; color: inherit; }
+.sidebar-mode .main-content { padding: 6px 10px; }
+.sidebar-mode .agent-view-container { gap: 8px; }
+.sidebar-mode .agent-meta-banner { padding: 5px 0; background: transparent; border: 0; }
+.sidebar-mode .agent-meta-path { display: none; }
+.sidebar-mode .section-card { border: 0; border-radius: 0; background: transparent; }
+.sidebar-mode .section-header { padding: 7px 0; gap: 6px; flex-wrap: wrap; background: transparent; }
+.sidebar-mode .section-header > span { display: none; }
+.sidebar-mode .section-title-wrap { gap: 4px; }
+.sidebar-mode .full-label { display: none; }
+.sidebar-mode .compact-label { display: inline; }
+.sidebar-mode .partition2-filter-group { background: transparent; border: 0; padding: 0; }
+.sidebar-mode .filter-pill-btn { padding: 3px 6px; }
+.sidebar-mode .agent-skill-row { padding: 7px 2px; gap: 6px; }
+.sidebar-mode .skill-main-info { flex: 1; min-width: 0; max-width: none; }
+.sidebar-mode .skill-desc-text { max-width: 100%; }
+.sidebar-mode [data-section="public"] .skill-title-row .badge-tag { display: none; }
+.sidebar-mode [data-section="public"] [data-action="delete-public"] { display: none; }
+.sidebar-mode .skill-row-actions { flex-shrink: 0; }
 
 /* Modals & Toasts */
 .modal-backdrop {

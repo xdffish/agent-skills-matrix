@@ -666,6 +666,9 @@ export class SkillsCliService {
     }
 
     return {
+      workspaceFolders: [],
+      workspaceSkills: [],
+      workspaceScanErrors: [],
       centralDirPath: this.centralDir,
       publicSkills,
       agents,

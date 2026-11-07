@@ -2,7 +2,7 @@
   "name": "agent-skills-matrix",
   "displayName": "Agent Skills Matrix",
   "description": "Multi-agent skill matrix dashboard and dispatcher powered by standard npx skills",
-  "version": "0.3.9",
+  "version": "0.5.2",
   "publisher": "defuxu",
   "author": {
     "name": "defuxu"
@@ -69,12 +69,23 @@
         "command": "agent-skills-matrix.open",
         "title": "Open Skills Matrix Dashboard",
         "category": "Skills Matrix"
+      },
+      {
+        "command": "agent-skills-matrix.openPanel",
+        "title": "Open Skills Matrix in Editor Area",
+        "category": "Skills Matrix",
+        "icon": "$(open-preview)"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "agent-skills-matrix.refresh",
+          "when": "view == agent-skills-matrix.view",
+          "group": "navigation"
+        },
+        {
+          "command": "agent-skills-matrix.openPanel",
           "when": "view == agent-skills-matrix.view",
           "group": "navigation"
         }

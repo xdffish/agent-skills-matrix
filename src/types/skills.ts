@@ -79,6 +79,10 @@ export interface AgentDetailData {
 }
 
 export interface MatrixData {
+  hostAgentId?: string;
+  workspaceFolders: string[];
+  workspaceSkills: Array<{ name: string; path: string; workspace: string; source: string; description: string }>;
+  workspaceScanErrors: string[];
   centralDirPath: string;
   publicSkills: PublicSkillItem[];
   agents: AgentDefinition[];

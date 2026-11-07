@@ -9,6 +9,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const cliService = new SkillsCliService();
   const provider = new MatrixWebviewProvider(context.extensionUri, cliService);
+  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => provider.refresh()));
 
   // Register Webview Provider
   context.subscriptions.push(
@@ -34,7 +35,12 @@ export function activate(context: vscode.ExtensionContext) {
   // Open the dashboard in the wide editor area instead of the narrow sidebar.
   context.subscriptions.push(
     vscode.commands.registerCommand('agent-skills-matrix.open', () => {
-      vscode.commands.executeCommand('agent-skills-matrix.view.focus');
+      vscode.commands.executeCommand('workbench.view.extension.agent-skills-matrix-container');
+    })
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand('agent-skills-matrix.openPanel', () => {
+      provider.openPanel();
     })
   );
 
@@ -43,7 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.StatusBarAlignment.Right,
     100
   );
-  statusBarItem.command = 'agent-skills-matrix.open';
+  statusBarItem.command = 'agent-skills-matrix.openPanel';
   statusBarItem.text = '$(circuit-board) Skills Matrix';
   statusBarItem.tooltip = 'Click to open Agent Skills Matrix Dashboard';
   statusBarItem.show();

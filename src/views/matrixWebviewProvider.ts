@@ -9,7 +9,7 @@ import {
 
 export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'agent-skills-matrix.view';
-  private _view?: vscode.WebviewView;
+  private _webview?: vscode.Webview;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -21,16 +21,24 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
-    this._view = webviewView;
+    this.attachWebview(webviewView.webview, true);
+  }
 
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this._extensionUri]
-    };
+  public openPanel() {
+    const panel = vscode.window.createWebviewPanel(
+      'agent-skills-matrix.dashboard',
+      'Agent Skills Matrix',
+      vscode.ViewColumn.One,
+      { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [this._extensionUri] }
+    );
+    this.attachWebview(panel.webview);
+  }
 
-    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
-
-    webviewView.webview.onDidReceiveMessage(async (data: WebviewToExtensionMsg) => {
+  private attachWebview(webview: vscode.Webview, sidebar = false) {
+    this._webview = webview;
+    webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
+    webview.html = this._getHtmlForWebview(webview, sidebar);
+    webview.onDidReceiveMessage(async (data: WebviewToExtensionMsg) => {
       try {
         switch (data.type) {
           case 'ready':
@@ -210,18 +218,40 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
           type: 'notify',
           status: 'error',
           message: err?.message || 'Operation failed'
-        });
+    });
         this.sendMessage({ type: 'setLoading', loading: false });
         await this.refresh();
       }
-    });
+        });
   }
 
   public async refresh() {
-    if (!this._view) return;
+    if (!this._webview) return;
     this.sendMessage({ type: 'setLoading', loading: true, text: 'Scanning skills & agents...' });
     try {
       const data = await this._cliService.getMatrixData();
+      const appName = vscode.env.appName.toLowerCase();
+      data.hostAgentId = appName.includes('antigravity') ? 'antigravity' : appName.includes('cursor') ? 'cursor' : undefined;
+      for (const folder of vscode.workspace.workspaceFolders || []) {
+        data.workspaceFolders.push(folder.name);
+        if (folder.uri.scheme !== 'file') {
+          data.workspaceScanErrors.push(`${folder.name}: 当前仅支持本地文件夹`);
+          continue;
+        }
+        for (const source of ['.github/skills', '.agents/skills', '.claude/skills']) {
+          const dir = path.join(folder.uri.fsPath, ...source.split('/'));
+          try {
+            for (const name of fs.readdirSync(dir)) {
+              if (name.startsWith('.')) continue;
+              const skillPath = path.join(dir, name);
+              if (!fs.existsSync(path.join(skillPath, 'SKILL.md'))) continue;
+              data.workspaceSkills.push({ name, path: skillPath, workspace: folder.name, source, description: this._cliService.extractSkillDescription(skillPath).description });
+            }
+          } catch (err: any) {
+            if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR') data.workspaceScanErrors.push(`${folder.name}/${source}: ${err.message}`);
+          }
+        }
+      }
       this.sendMessage({ type: 'setData', data });
     } catch (err: any) {
       this.sendMessage({
@@ -235,8 +265,8 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public sendMessage(message: ExtensionToWebviewMsg) {
-    if (this._view) {
-      this._view.webview.postMessage(message);
+    if (this._webview) {
+      this._webview.postMessage(message);
     }
   }
 
@@ -249,7 +279,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
     return text;
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview): string {
+  private _getHtmlForWebview(webview: vscode.Webview, sidebar = false): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview.js')
     );
@@ -267,7 +297,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   <title>Agent Skills Matrix</title>
   <link rel="stylesheet" href="${styleUri}">
 </head>
-<body>
+<body class="${sidebar ? 'sidebar-mode' : 'panel-mode'}">
   <div id="loading-bar" class="loading-bar"></div>
 
   <!-- Header & Top Nav -->
