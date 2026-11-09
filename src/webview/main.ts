@@ -129,6 +129,26 @@ function init() {
     render();
   });
 
+  window.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+      e.preventDefault();
+      searchInput?.focus();
+      searchInput?.select();
+    } else if (e.key === 'Escape') {
+      if (addModal?.classList.contains('open')) {
+        closeAddModal();
+      } else if (state.searchQuery || (searchInput && searchInput.value)) {
+        state.searchQuery = '';
+        if (searchInput) {
+          searchInput.value = '';
+          searchInput.blur();
+        }
+        if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+        render();
+      }
+    }
+  });
+
   addSkillBtn?.addEventListener('click', () => openAddModal());
   modalCloseBtn?.addEventListener('click', closeAddModal);
   modalCancelBtn?.addEventListener('click', closeAddModal);

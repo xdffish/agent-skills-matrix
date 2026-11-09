@@ -120,12 +120,23 @@ function pointsTo(link: string, target: string): boolean {
   } catch { return false; }
 }
 function identicalTrees(a: string, b: string): boolean {
-  const x = fs.lstatSync(a), y = fs.lstatSync(b);
+  const x = safeLstat(a), y = safeLstat(b);
+  if (!x || !y) return false;
   if (x.isSymbolicLink() || y.isSymbolicLink()) return false;
-  if (x.isFile() && y.isFile()) return x.size === y.size && fs.readFileSync(a).equals(fs.readFileSync(b));
+  if (x.isFile() && y.isFile()) {
+    try {
+      return x.size === y.size && fs.readFileSync(a).equals(fs.readFileSync(b));
+    } catch {
+      return false;
+    }
+  }
   if (!x.isDirectory() || !y.isDirectory()) return false;
-  const aa = fs.readdirSync(a).sort(), bb = fs.readdirSync(b).sort();
-  return aa.length === bb.length && aa.every((n, i) => n === bb[i] && identicalTrees(path.join(a, n), path.join(b, n)));
+  try {
+    const aa = fs.readdirSync(a).sort(), bb = fs.readdirSync(b).sort();
+    return aa.length === bb.length && aa.every((n, i) => n === bb[i] && identicalTrees(path.join(a, n), path.join(b, n)));
+  } catch {
+    return false;
+  }
 }
 
 export class SkillsCliService {
@@ -163,6 +174,19 @@ export class SkillsCliService {
     return new Promise((resolve, reject) => {
       let command = 'npx';
       let commandArgs = ['--yes', 'skills', ...args];
+
+      const envPath = process.env.PATH || '';
+      const extraPaths = [
+        '/opt/homebrew/bin',
+        '/usr/local/bin',
+        path.join(this.homedir, '.nvm', 'current', 'bin'),
+        path.join(this.homedir, '.local', 'bin'),
+        path.join(this.homedir, '.volta', 'bin'),
+        path.join(this.homedir, '.asdf', 'shims')
+      ];
+      const validExtra = extraPaths.filter(p => fs.existsSync(p));
+      const mergedPath = [...validExtra, envPath].join(path.delimiter);
+
       if (process.platform === 'win32') {
         const appData = process.env.APPDATA || path.join(this.homedir, 'AppData', 'Roaming');
         const candidates = [
@@ -177,10 +201,18 @@ export class SkillsCliService {
         }
         command = process.execPath;
         commandArgs = [npxCli, '--yes', 'skills', ...args];
+      } else {
+        // 在 macOS/Linux 上如果 npx 命令不在默认 PATH，尝试使用探测到的绝对路径
+        if (!envPath.includes('/opt/homebrew/bin') && fs.existsSync('/opt/homebrew/bin/npx')) {
+          command = '/opt/homebrew/bin/npx';
+        } else if (!envPath.includes('/usr/local/bin') && fs.existsSync('/usr/local/bin/npx')) {
+          command = '/usr/local/bin/npx';
+        }
       }
+
       const proc = childProcess.spawn(command, commandArgs, {
         shell: false,
-        env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' }
+        env: { ...process.env, PATH: mergedPath, FORCE_COLOR: '0', NO_COLOR: '1' }
       });
       let stdout = '';
       let stderr = '';
@@ -431,19 +463,27 @@ export class SkillsCliService {
       }
 
       if (agent.id === 'antigravity') {
-        const builtinDir = path.join(this.homedir, '.gemini', 'antigravity', 'builtin', 'skills');
-        if (fs.existsSync(builtinDir)) {
-          for (const b of fs.readdirSync(builtinDir)) {
-            const bp = path.join(builtinDir, b);
-            if (fs.existsSync(path.join(bp, 'SKILL.md'))) {
-              builtinSkills.push({
-                name: b,
-                agentId: agent.id,
-                path: bp,
-                category: 'builtin',
-                badgeText: 'Built-in',
-                description: getLocalizedDescription(b, this.extractSkillDescription(bp).description)
-              });
+        const candidateBuiltinDirs = [
+          path.join(this.homedir, '.gemini', 'antigravity', 'builtin', 'skills'),
+          path.join(this.homedir, '.gemini', 'antigravity-cli', 'builtin', 'skills')
+        ];
+        const seenBuiltinNames = new Set<string>();
+        for (const builtinDir of candidateBuiltinDirs) {
+          if (fs.existsSync(builtinDir)) {
+            for (const b of fs.readdirSync(builtinDir)) {
+              if (seenBuiltinNames.has(b)) continue;
+              const bp = path.join(builtinDir, b);
+              if (fs.existsSync(path.join(bp, 'SKILL.md'))) {
+                seenBuiltinNames.add(b);
+                builtinSkills.push({
+                  name: b,
+                  agentId: agent.id,
+                  path: bp,
+                  category: 'builtin',
+                  badgeText: 'Built-in',
+                  description: getLocalizedDescription(b, this.extractSkillDescription(bp).description)
+                });
+              }
             }
           }
         }
@@ -763,7 +803,16 @@ export class SkillsCliService {
       throw new Error(`Central skill ${skillName} does not exist. Cannot deduplicate.`);
     }
 
-    if (!safeLstat(sourcePath)?.isDirectory() || !identicalTrees(sourcePath, fs.realpathSync(centralPath))) throw new Error(`同名技能内容不同或包含软链接，已保留：${skillName}`);
+    let realCentralPath: string;
+    try {
+      realCentralPath = fs.realpathSync(centralPath);
+    } catch {
+      throw new Error(`公共池技能「${skillName}」路径无效或无法解析实际路径`);
+    }
+
+    if (!safeLstat(sourcePath)?.isDirectory() || !identicalTrees(sourcePath, realCentralPath)) {
+      throw new Error(`同名技能内容不同或包含软链接，已保留：${skillName}`);
+    }
     const backup = fs.mkdtempSync(path.join(path.dirname(sourcePath), '.skills-matrix-backup-'));
     const saved = path.join(backup, skillName);
     fs.renameSync(sourcePath, saved);

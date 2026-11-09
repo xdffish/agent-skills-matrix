@@ -2,7 +2,7 @@
   "name": "agent-skills-matrix-vsc",
   "displayName": "Agent Skills Matrix — Multi-Agent Skill Manager",
   "description": "Multi-agent skill matrix dashboard and dispatcher powered by standard npx skills",
-  "version": "0.5.13",
+  "version": "0.5.14",
   "publisher": "xdffish",
   "author": {
     "name": "defuxu"

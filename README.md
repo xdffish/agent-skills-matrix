@@ -2,10 +2,12 @@
 
 **简体中文** | [English](README_EN.md)
 
-[![Version](https://img.shields.io/badge/version-0.5.13-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.14-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Agent Skills Matrix 管理界面截图](docs/screenshots/dashboard.png)
+| 编辑器主区域管理面板 | 侧边栏紧凑模式 |
+| :---: | :---: |
+| ![Agent Skills Matrix 管理界面截图](docs/screenshots/dashboard.png) | ![侧边栏紧凑模式](docs/screenshots/sidebar.png) |
 
 Agent Skills Matrix 是一个用于查看和管理多个 AI Agent 技能目录的 VS Code 兼容扩展。它直接读取文件系统状态，并使用 `npx skills` 安装技能包。
 
@@ -48,11 +50,11 @@ cursor --install-extension xdffish.agent-skills-matrix-vsc
 antigravity --install-extension xdffish.agent-skills-matrix-vsc
 ```
 
-也可以下载 `agent-skills-matrix-vsc-0.5.13.vsix`，在命令面板选择 **Extensions: Install from VSIX...** 安装：
+也可以下载 `agent-skills-matrix-vsc-0.5.14.vsix`，在命令面板选择 **Extensions: Install from VSIX...** 安装：
 
 ```bash
-code --install-extension agent-skills-matrix-vsc-0.5.13.vsix
-cursor --install-extension agent-skills-matrix-vsc-0.5.13.vsix
+code --install-extension agent-skills-matrix-vsc-0.5.14.vsix
+cursor --install-extension agent-skills-matrix-vsc-0.5.14.vsix
 ```
 
 早前以 `denny` 发布者上传的 0.5.10 和 Open VSX 上的旧 ID `xdffish.agent-skills-matrix` 都不再更新；旧 Open VSX 条目正在申请弃用并引导到当前 ID `xdffish.agent-skills-matrix-vsc`。VS Code Marketplace 规定已删除扩展的名称永久保留，因此当前扩展 ID 带 `-vsc` 后缀。VSIX 安装包也已通过 Antigravity IDE CLI 在本机安装；其他 Antigravity 发行版本的兼容性尚未验证。更新后请重新加载编辑器窗口。

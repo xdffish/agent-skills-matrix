@@ -2,10 +2,12 @@
 
 [简体中文](README.md) | **English**
 
-[![Version](https://img.shields.io/badge/version-0.5.13-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
+[![Version](https://img.shields.io/badge/version-0.5.14-blue.svg)](https://github.com/xdffish/agent-skills-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Agent Skills Matrix dashboard](docs/screenshots/dashboard.png)
+| Editor Panel Dashboard | Compact Sidebar View |
+| :---: | :---: |
+| ![Agent Skills Matrix dashboard](docs/screenshots/dashboard.png) | ![Compact sidebar view](docs/screenshots/sidebar.png) |
 
 Agent Skills Matrix is a VS Code-compatible extension for inspecting and managing skill directories across multiple AI agents. It reads filesystem state directly and uses `npx skills` for package installation.
 
@@ -48,11 +50,11 @@ cursor --install-extension xdffish.agent-skills-matrix-vsc
 antigravity --install-extension xdffish.agent-skills-matrix-vsc
 ```
 
-Alternatively, download `agent-skills-matrix-vsc-0.5.13.vsix` and use **Extensions: Install from VSIX...** in the Command Palette:
+Alternatively, download `agent-skills-matrix-vsc-0.5.14.vsix` and use **Extensions: Install from VSIX...** in the Command Palette:
 
 ```bash
-code --install-extension agent-skills-matrix-vsc-0.5.13.vsix
-cursor --install-extension agent-skills-matrix-vsc-0.5.13.vsix
+code --install-extension agent-skills-matrix-vsc-0.5.14.vsix
+cursor --install-extension agent-skills-matrix-vsc-0.5.14.vsix
 ```
 
 The earlier 0.5.10 release under the `denny` publisher and the old Open VSX ID `xdffish.agent-skills-matrix` are no longer updated. The old Open VSX listing is being submitted for deprecation with a replacement link to `xdffish.agent-skills-matrix-vsc`. The VS Code Marketplace permanently reserves the name of a removed extension, so the current extension ID carries a `-vsc` suffix. The VSIX package has also been installed locally with the Antigravity IDE CLI; compatibility with other Antigravity distributions has not been verified. Reload the editor window after an update.

@@ -9,7 +9,7 @@ import {
 
 export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'agent-skills-matrix.view';
-  private _webview?: vscode.Webview;
+  private _webviews = new Set<vscode.Webview>();
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -22,6 +22,9 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ) {
     this.attachWebview(webviewView.webview, true);
+    webviewView.onDidDispose(() => {
+      this._webviews.delete(webviewView.webview);
+    });
   }
 
   public openPanel() {
@@ -31,11 +34,14 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
       vscode.ViewColumn.One,
       { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [this._extensionUri] }
     );
-    this.attachWebview(panel.webview);
+    this.attachWebview(panel.webview, false);
+    panel.onDidDispose(() => {
+      this._webviews.delete(panel.webview);
+    });
   }
 
   private attachWebview(webview: vscode.Webview, sidebar = false) {
-    this._webview = webview;
+    this._webviews.add(webview);
     webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
     webview.html = this._getHtmlForWebview(webview, sidebar);
     webview.onDidReceiveMessage(async (data: WebviewToExtensionMsg) => {
@@ -226,7 +232,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public async refresh() {
-    if (!this._webview) return;
+    if (this._webviews.size === 0) return;
     this.sendMessage({ type: 'setLoading', loading: true, text: 'Scanning skills & agents...' });
     try {
       const data = await this._cliService.getMatrixData();
@@ -265,8 +271,12 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public sendMessage(message: ExtensionToWebviewMsg) {
-    if (this._webview) {
-      this._webview.postMessage(message);
+    for (const webview of this._webviews) {
+      try {
+        webview.postMessage(message);
+      } catch (err) {
+        console.error('Failed to postMessage to webview:', err);
+      }
     }
   }
 
@@ -323,7 +333,7 @@ export class MatrixWebviewProvider implements vscode.WebviewViewProvider {
     <div class="toolbar">
       <div class="search-wrapper">
         <span class="search-icon">🔍</span>
-        <input type="text" id="search-input" class="search-input" placeholder="Search skills or description...">
+        <input type="text" id="search-input" class="search-input" placeholder="Search skills or description... (⌘F / Ctrl+F)">
         <button id="clear-search-btn" class="clear-search">×</button>
       </div>
       <div id="quick-filter-container">

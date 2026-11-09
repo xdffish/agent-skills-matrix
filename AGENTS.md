@@ -46,6 +46,7 @@
    ```bash
    cursor --install-extension agent-skills-matrix-vsc-<version>.vsix --force
    "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension agent-skills-matrix-vsc-<version>.vsix --force
+   "/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide" --install-extension agent-skills-matrix-vsc-<version>.vsix --force
    ```
 5. **Git 提交并附带版本号标签**：
    ```bash
@@ -126,9 +127,10 @@ npm run compile
 # 4. 打包为 vsix 安装包
 npx @vscode/vsce package --no-dependencies
 
-# 5. 一键安装更新到 Cursor 与 VS Code
+# 5. 一键安装更新到 Cursor、VS Code 与 Antigravity IDE
 cursor --install-extension agent-skills-matrix-vsc-<version>.vsix --force
 "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension agent-skills-matrix-vsc-<version>.vsix --force
+"/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide" --install-extension agent-skills-matrix-vsc-<version>.vsix --force
 ```
 
 ---
@@ -147,6 +149,13 @@ cursor --install-extension agent-skills-matrix-vsc-<version>.vsix --force
 ---
 
 ## 📜 7. 变更日志 (Changelog)
+
+### v0.5.14 (2026-11-09)
+- **Fix**: 修复多 Webview 实例管理缺陷，升级为活跃实例池与广播分发，在 Panel 与 Sidebar 同时开启时保持状态实时同步，并在销毁时注销引用避免僵死。
+- **Fix**: 优化跨平台 CLI 环境，在 macOS/Linux GUI 启动环境下自动探测并注入 Homebrew/NVM/Volta 常用 PATH 与 npx 路径，杜绝 `spawn npx ENOENT` 报错。
+- **Fix**: 强化底层文件系统真值检验，`identicalTrees` 与 `deduplicatePrivateSkill` 增加死链防御与异常安全捕获。
+- **Feat**: 兼容 Antigravity 内置技能路径，同时扫描 `.gemini/antigravity/builtin/skills` 与 `.gemini/antigravity-cli/builtin/skills` 并自动去重。
+- **UX**: Webview 增加 `Cmd/Ctrl + F` 快速聚焦搜索框、`Esc` 一键清空搜索交互；更新中英文 README 的侧栏紧凑模式截图对比。
 
 ### v0.5.13 (2026-11-07)
 - **Release**: 发布当前扩展 ID `xdffish.agent-skills-matrix-vsc` 的 0.5.13 版本。
